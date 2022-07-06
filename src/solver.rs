@@ -1,32 +1,33 @@
-use crate::four_line_board::*;
+pub trait Board<M: Move> {
+    fn make_move(&mut self, mv: &M);
+    fn undo_move(&mut self, mv: &M);
+    fn gen_moves(&self) -> Vec<M>;
+    fn solved(&self) -> bool;
+}
 
-impl Board {
-    fn solution(&mut self) -> Option<Vec<Move>> {
-        if self.bitboard == 0 {
-            return Some(vec![]);
-        }
+pub trait Move {}
 
-        // TODO pruning
-
-        let moves = self.gen_moves();
-
-        for mv in moves {
-            self.make_move(&mv);
-            if let Some(mut sol) = self.solution() {
-                self.undo_move(&mv);
-
-                let mut vec = vec![mv];
-
-                vec.append(&mut sol);
-
-                return Some(vec);
-            }
-            self.undo_move(&mv);
-        }
-        None
+fn solution<M: Move, B: Board<M>>(board: &mut B) -> Option<Vec<M>> {
+    if board.solved() {
+        return Some(vec![]);
     }
-    
-    fn solutions(&mut self) -> Option<Vec<Vec<Move>>> {
-        todo!();
+
+    // TODO pruning
+
+    let moves = board.gen_moves();
+
+    for mv in moves {
+        board.make_move(&mv);
+        if let Some(mut sol) = solution(board) {
+            board.undo_move(&mv);
+
+            let mut vec = vec![mv];
+
+            vec.append(&mut sol);
+
+            return Some(vec);
+        }
+        board.undo_move(&mv);
     }
+    None
 }

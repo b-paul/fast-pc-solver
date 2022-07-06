@@ -1,30 +1,36 @@
-pub struct Board {
+use crate::solver::{Board, Move};
+
+pub struct FourLineBoard {
     pub bitboard: u64,
     // How should this be implemented
     pub queue: u32,
     pub hold: u8,
 }
 
-pub struct Move {
-    // idk
-    // x, y, mino, ishold, rotation
+pub struct FourLineMove {
+    // x, y, mino, hold, rotation
     // 0 <= x < 10
     // 0 <= y < 4
     // mino is one of 7 possible values
-    // ishold is a bool
+    // hold is a bool
     // rotation is one of 4 values
 }
 
-impl Board {
-    pub fn make_move(&mut self, mv: &Move) {
+impl Move for FourLineMove {}
+impl Board<FourLineMove> for FourLineBoard {
+    fn make_move(&mut self, mv: &FourLineMove) {
         todo!();
     }
     // Undo redo is probably faster than copying a board every time
-    pub fn undo_move(&mut self, mv: &Move) {
+    fn undo_move(&mut self, mv: &FourLineMove) {
         todo!();
     }
     // Possibly only want to incrementally generate moves to save on computation
-    pub fn gen_moves(&self) -> Vec<Move> {
+    fn gen_moves(&self) -> Vec<FourLineMove> {
+        todo!();
+    }
+
+    fn solved(&self) -> bool {
         todo!();
     }
 }
