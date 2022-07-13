@@ -1,5 +1,5 @@
 use crate::types::*;
-use std::collections::{HashSet, VecDeque};
+use rustc_hash::FxHashSet;
 
 /// Board is represented using a bitboard
 /// Based on wirelyre's idea
@@ -124,9 +124,7 @@ impl FourLineMove {
             return false;
         }
 
-        mask = mask
-            .overflowing_shl((self.x - min_x + 10 * (self.y - min_y)).into())
-            .0;
+        mask <<= (self.x - min_x + 10 * (self.y - min_y)) % 64;
 
         (mask & board.board) != 0
     }
@@ -277,16 +275,18 @@ impl FourLineBoard {
 
 struct FourLineMoveGenerator {
     board: FourLineBoard,
-    queue: VecDeque<FourLineMove>,
-    table: HashSet<FourLineMove>,
-    hd_table: HashSet<u64>,
+    stack: Vec<FourLineMove>,
+    table: FxHashSet<FourLineMove>,
+    hd_table: FxHashSet<u64>,
 }
 
 impl FourLineMoveGenerator {
     fn new(board: FourLineBoard) -> Self {
-        let mut queue = VecDeque::new();
-        let mut table = HashSet::new();
-        let hd_table = HashSet::new();
+        let mut stack = Vec::new();
+
+        let mut table = FxHashSet::default();
+        let hd_table = FxHashSet::default();
+
         // get the first move!
         if let Some(piece) = board.piece {
             let mv = FourLineMove {
@@ -296,7 +296,7 @@ impl FourLineMoveGenerator {
                 x: 5,
                 y: 4,
             };
-            queue.push_back(mv);
+            stack.push(mv);
             table.insert(mv);
         }
 
@@ -308,26 +308,26 @@ impl FourLineMoveGenerator {
                 x: 5,
                 y: 4,
             };
-            queue.push_back(mv);
+            stack.push(mv);
             table.insert(mv);
         }
 
         FourLineMoveGenerator {
             board,
-            queue,
+            stack,
             table,
             hd_table,
         }
     }
 
     fn next(&mut self) -> Option<FourLineMove> {
-        while let Some(mv) = self.queue.pop_front() {
+        while let Some(mv) = self.stack.pop() {
             // do stuff
-            // Add all of the operations that stem off of this action to the queue
+            // Add all of the operations that stem off of this action to the stack
             for shift in [Shift::TapLeft, Shift::TapRight] {
                 if let Some(mv) = mv.shift(&self.board, shift) {
                     if !self.table.contains(&mv) {
-                        self.queue.push_back(mv);
+                        self.stack.push(mv);
                         self.table.insert(mv);
                     }
                 }
@@ -335,7 +335,7 @@ impl FourLineMoveGenerator {
             for spin in [Spin::Clockwise, Spin::AntiClockwise, Spin::Half] {
                 if let Some(mv) = mv.rotate(&self.board, spin) {
                     if !self.table.contains(&mv) {
-                        self.queue.push_back(mv);
+                        self.stack.push(mv);
                         self.table.insert(mv);
                     }
                 }
@@ -347,15 +347,13 @@ impl FourLineMoveGenerator {
 
             // Add soft drop
             if !self.table.contains(&drop) {
-                self.queue.push_back(drop);
+                self.stack.push(drop);
                 self.table.insert(drop);
             }
 
             let (piece_mask, min_x, min_y, _) = drop.piece_mask();
 
-            let piece_mask = piece_mask
-                .overflowing_shl((10 * (drop.y - min_y) + drop.x - min_x).into())
-                .0;
+            let piece_mask = piece_mask << ((10 * (drop.y - min_y) + drop.x - min_x) % 64);
 
             if drop.is_four_line(&self.board) && !self.hd_table.contains(&piece_mask) {
                 self.hd_table.insert(piece_mask);
@@ -433,7 +431,9 @@ mod tests {
         board.grid[2] = [
             CYAN, ORANGE, RED, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY,
         ];
-        board.grid[1] = [CYAN, RED, RED, GREEN, GREEN, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY];
+        board.grid[1] = [
+            CYAN, RED, RED, GREEN, GREEN, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY,
+        ];
         board.grid[0] = [
             CYAN, RED, GREEN, GREEN, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY,
         ];
