@@ -51,9 +51,9 @@ impl FourLineMove {
             },
             Mino::T => match self.rotation {
                 Rotation::North => (0x807, 1, 0, 8),
-                Rotation::East => (0x100C01, 1, 1, 9),
+                Rotation::East => (0x100C01, 0, 1, 8),
                 Rotation::South => (0x1C02, 1, 1, 8),
-                Rotation::West => (0x200C02, 0, 1, 8),
+                Rotation::West => (0x200C02, 1, 1, 9),
             },
             Mino::O => match self.rotation {
                 Rotation::North => (0xC03, 0, 0, 8),
