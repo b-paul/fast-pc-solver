@@ -273,7 +273,7 @@ impl FourLineBoard {
     }
 }
 
-struct FourLineMoveGenerator {
+pub struct FourLineMoveGenerator {
     board: FourLineBoard,
     stack: Vec<FourLineMove>,
     table: FxHashSet<FourLineMove>,
@@ -281,7 +281,7 @@ struct FourLineMoveGenerator {
 }
 
 impl FourLineMoveGenerator {
-    fn new(board: FourLineBoard) -> Self {
+    pub fn new(board: FourLineBoard) -> Self {
         let mut stack = Vec::new();
 
         let mut table = FxHashSet::default();
@@ -319,8 +319,12 @@ impl FourLineMoveGenerator {
             hd_table,
         }
     }
+}
 
-    fn next(&mut self) -> Option<FourLineMove> {
+impl Iterator for FourLineMoveGenerator {
+    type Item = FourLineMove;
+
+    fn next(&mut self) -> Option<Self::Item> {
         while let Some(mv) = self.stack.pop() {
             // do stuff
             // Add all of the operations that stem off of this action to the stack
@@ -361,6 +365,314 @@ impl FourLineMoveGenerator {
             }
         }
         None
+    }
+}
+
+use std::simd::prelude::*;
+
+pub struct BitwiseMoveGenerator {
+    cur_moves: u64x4,
+    hold_moves: u64x4,
+}
+
+fn srs_table(piece: Mino) -> ([[u64x4; 5]; 2], [[u64x4; 5]; 2], [[u64x4; 5]; 2]) {
+    const LEFT_WALL: u64 = 0x0040100401;
+    const LEFT_WALL2: u64 = LEFT_WALL | LEFT_WALL << 1;
+    const RIGHT_WALL: u64 = 0x8002080020;
+    const RIGHT_WALL2: u64 = RIGHT_WALL | RIGHT_WALL >> 1;
+    match piece {
+        Mino::O => (
+            [[u64x4::splat(0); 5]; 2],
+            [[u64x4::splat(0); 5]; 2],
+            [[u64x4::splat(0); 5]; 2],
+        ),
+        Mino::I => (
+            [
+                [
+                    u64x4::from_array([0, 0, 10, 1]),
+                    u64x4::from_array([0, 1, 11, 0]),
+                    u64x4::from_array([0, 0, 8, 2]),
+                    u64x4::from_array([9, 11, 0, 0]),
+                    u64x4::from_array([0, 0, 18, 22]),
+                ],
+                [
+                    u64x4::from_array([1, 0, 0, 10]),
+                    u64x4::from_array([0, 0, 1, 11]),
+                    u64x4::from_array([2, 19, 0, 8]),
+                    u64x4::from_array([0, 0, 9, 0]),
+                    u64x4::from_array([22, 18, 0, 18]),
+                ],
+            ],
+            [
+                [
+                    u64x4::from_array([10, 1, 0, 0]),
+                    u64x4::from_array([11, 0, 0, 1]),
+                    u64x4::from_array([8, 2, 0, 0]),
+                    u64x4::from_array([0, 0, 9, 11]),
+                    u64x4::from_array([18, 22, 0, 0]),
+                ],
+                [
+                    u64x4::from_array([0, 10, 1, 0]),
+                    u64x4::from_array([1, 11, 0, 0]),
+                    u64x4::from_array([0, 0, 2, 0]),
+                    u64x4::from_array([11, 9, 0, 9]),
+                    u64x4::from_array([0, 0, 22, 0]),
+                ],
+            ],
+            [
+                [
+                    u64x4::from_array([0, LEFT_WALL, 0, RIGHT_WALL]),
+                    u64x4::from_array([LEFT_WALL, RIGHT_WALL, RIGHT_WALL, LEFT_WALL]),
+                    u64x4::from_array([RIGHT_WALL2, LEFT_WALL2, LEFT_WALL2, RIGHT_WALL2]),
+                    u64x4::from_array([LEFT_WALL, RIGHT_WALL, RIGHT_WALL, LEFT_WALL]),
+                    u64x4::from_array([RIGHT_WALL2, LEFT_WALL2, LEFT_WALL2, RIGHT_WALL2]),
+                ],
+                [
+                    u64x4::from_array([RIGHT_WALL, 0, LEFT_WALL, 0]),
+                    u64x4::from_array([LEFT_WALL, LEFT_WALL, RIGHT_WALL, RIGHT_WALL]),
+                    u64x4::from_array([RIGHT_WALL2, RIGHT_WALL2, LEFT_WALL2, LEFT_WALL2]),
+                    u64x4::from_array([LEFT_WALL, LEFT_WALL, RIGHT_WALL, RIGHT_WALL]),
+                    u64x4::from_array([RIGHT_WALL2, RIGHT_WALL2, LEFT_WALL2, LEFT_WALL2]),
+                ],
+            ],
+        ),
+        _ => (
+            [
+                [
+                    u64x4::from_array([0, 0, 0, 0]),
+                    u64x4::from_array([1, 1, 0, 0]),
+                    u64x4::from_array([11, 0, 9, 0]),
+                    u64x4::from_array([0, 11, 0, 20]),
+                    u64x4::from_array([0, 0, 0, 19]),
+                ],
+                [
+                    u64x4::from_array([0, 0, 0, 0]),
+                    u64x4::from_array([0, 0, 1, 0]),
+                    u64x4::from_array([9, 0, 11, 0]),
+                    u64x4::from_array([0, 9, 0, 20]),
+                    u64x4::from_array([0, 0, 0, 19]),
+                ],
+            ],
+            [
+                [
+                    u64x4::from_array([0, 1, 0, 0]),
+                    u64x4::from_array([0, 0, 1, 1]),
+                    u64x4::from_array([0, 2, 0, 11]),
+                    u64x4::from_array([2, 0, 20, 0]),
+                    u64x4::from_array([19, 22, 21, 0]),
+                ],
+                [
+                    u64x4::from_array([0, 10, 0, 0]),
+                    u64x4::from_array([1, 11, 0, 1]),
+                    u64x4::from_array([0, 8, 0, 11]),
+                    u64x4::from_array([20, 0, 20, 0]),
+                    u64x4::from_array([21, 18, 19, 0]),
+                ],
+            ],
+            [
+                [
+                    u64x4::from_array([0, 0, 0, 0]),
+                    u64x4::from_array([RIGHT_WALL, RIGHT_WALL, LEFT_WALL, LEFT_WALL]),
+                    u64x4::from_array([RIGHT_WALL, RIGHT_WALL, LEFT_WALL, LEFT_WALL]),
+                    u64x4::from_array([0, 0, 0, 0]),
+                    u64x4::from_array([RIGHT_WALL, RIGHT_WALL, LEFT_WALL, LEFT_WALL]),
+                ],
+                [
+                    u64x4::from_array([0, 0, 0, 0]),
+                    u64x4::from_array([LEFT_WALL, RIGHT_WALL, RIGHT_WALL, LEFT_WALL]),
+                    u64x4::from_array([LEFT_WALL, RIGHT_WALL, RIGHT_WALL, LEFT_WALL]),
+                    u64x4::from_array([0, 0, 0, 0]),
+                    u64x4::from_array([LEFT_WALL, RIGHT_WALL, RIGHT_WALL, LEFT_WALL]),
+                ],
+            ],
+        ),
+    }
+}
+
+fn gen_occs(board: u64, piece: Mino) -> u64x4 {
+    const LEFT_WALL: u64 = 0x0040100401;
+    const LEFT_WALL2: u64 = LEFT_WALL | LEFT_WALL << 1;
+    const RIGHT_WALL: u64 = 0x8002080020;
+    let board_mask: u64x4 = u64x4::splat(0xffffffffff); // maybe bad
+    let board_l2 = board & !LEFT_WALL2;
+    let board_l = board & !LEFT_WALL;
+    let board_r = board & !RIGHT_WALL;
+    // TODO account for pieces not being allowed at walls
+    match piece {
+        Mino::O => {
+            u64x4::from_array([
+                board | board_r << 1 | board << 10 | board_r << 11,
+                0xffffffffff,
+                0xffffffffff,
+                0xffffffffff,
+            ]) & board_mask
+        }
+        Mino::I => {
+            u64x4::from_array([
+                board_l2 >> 2 | board_l >> 1 | board | board_r << 1,
+                board >> 20 | board >> 10 | board | board << 10,
+                board_l2 >> 2 | board_l >> 1 | board | board_r << 1,
+                board >> 20 | board >> 10 | board | board << 10,
+            ]) & board_mask
+        }
+        Mino::T => {
+            u64x4::from_array([
+                board >> 10 | board_l >> 1 | board | board_r << 1,
+                board >> 10 | board | board_r << 1 | board << 10,
+                board_l >> 1 | board | board_r << 1 | board << 10,
+                board >> 10 | board_l >> 1 | board | board << 10,
+            ]) & board_mask
+        }
+        Mino::J => {
+            u64x4::from_array([
+                board_l >> 11 | board_l >> 1 | board | board_r << 1,
+                board >> 10 | board_r >> 9 | board | board << 10,
+                board_l >> 1 | board | board_r << 1 | board_r << 11,
+                board >> 10 | board | board_l << 9 | board_l << 10,
+            ]) & board_mask
+        }
+        Mino::L => {
+            u64x4::from_array([
+                board_r >> 9 | board_l >> 1 | board | board_r << 1,
+                board >> 10 | board | board << 10 | board_r << 11,
+                board_l >> 1 | board | board_r << 1 | board_l << 9,
+                board_l >> 11 | board_l >> 10 | board | board << 10,
+            ]) & board_mask
+        }
+        Mino::S => {
+            u64x4::from_array([
+                board >> 10 | board_r >> 9 | board_l >> 1 | board,
+                board >> 10 | board | board_r << 1 | board_r << 11,
+                board >> 10 | board_r >> 9 | board_l >> 1 | board,
+                board >> 10 | board | board_r << 1 | board_r << 11,
+            ]) & board_mask
+        }
+        Mino::Z => {
+            u64x4::from_array([
+                board_l >> 11 | board >> 10 | board | board_r << 1,
+                board_r >> 9 | board | board_r << 1 | board << 10,
+                board_l >> 11 | board >> 10 | board | board_r << 1,
+                board_r >> 9 | board | board_r << 1 | board << 10,
+            ]) & board_mask
+        }
+    }
+}
+
+fn print_bitboard(bb: u64) {
+    for y in (0..4).rev() {
+        for x in 0..10 {
+            if bb & (1 << (y * 10 + x)) != 0 {
+                print!("#");
+            } else {
+                print!(".");
+            }
+        }
+        println!();
+    }
+    println!();
+}
+
+fn bitwise_gen(board: u64, piece: Option<Mino>) -> u64x4 {
+    let Some(piece) = piece else {
+        return u64x4::splat(0);
+    };
+
+    let (left_srs, right_srs, srs_masks) = srs_table(piece);
+
+    let occs = gen_occs(board, piece);
+    let mut moves = !occs & u64x4::splat(0x3FF << 30);
+    let mut last = u64x4::splat(0);
+
+    let left_wall = u64x4::splat(0x0040100401);
+    let right_wall = u64x4::splat(0x8002080020);
+
+    while moves != last {
+        last = moves;
+
+        let mut last_fill = u64x4::splat(0);
+        while last_fill != moves {
+            last_fill = moves;
+            moves |= (moves >> 10) & !occs;
+            //moves |= ((moves & !left_wall) << 1) & !occs;
+            moves |= ((occs | (left_wall & !moves)) - moves) & !occs;
+            moves |= ((moves & !right_wall) >> 1) & !occs;
+        }
+
+        // please unroll this loop compiler thanks
+        for dir in 0..2 {
+            // We will clear out the bits in rotating that pass an srs test.
+            let mut rotating = if dir == 0 {
+                simd_swizzle!(moves, [1, 2, 3, 0])
+            } else {
+                simd_swizzle!(moves, [3, 0, 1, 2])
+            };
+            let mut new_moves = u64x4::splat(0);
+            for test in 0..5 {
+                let ls = left_srs[dir][test];
+                let rs = right_srs[dir][test];
+                let mask = srs_masks[dir][test];
+
+                let moved = ((rotating & mask) << ls >> rs) & !occs;
+                rotating &= !(moved >> ls << rs);
+                new_moves |= moved;
+            }
+            moves |= new_moves;
+        }
+    }
+
+    // TODO hard drop only (no floating placements)
+
+    // TODO deduplicate
+
+    println!("Piece: {piece:?}");
+
+    println!("Board:\n");
+    print_bitboard(board);
+
+    println!("Moves: ");
+    for &bb in moves.as_array() {
+        print_bitboard(bb);
+    }
+
+    moves
+}
+
+#[test]
+fn test_bitwise() {
+    // Queue OTJJOL
+    use super::{interface_board::Board, types::{Mino::*, CellColour::*}};
+
+    let mut board = Board {
+        grid: [[CellColour::EMPTY; 10]; 40],
+        hold: None,
+        piece: O,
+        queue: vec![J, T, S, Z, L],
+    };
+    board.grid[3] = [
+        CYAN, ORANGE, ORANGE, ORANGE, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY,
+    ];
+    board.grid[2] = [
+        CYAN, ORANGE, RED, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY,
+    ];
+    board.grid[1] = [
+        CYAN, RED, RED, GREEN, GREEN, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY,
+    ];
+    board.grid[0] = [
+        CYAN, RED, GREEN, GREEN, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY,
+    ];
+
+    let four_line = board.to_four_line().unwrap();
+
+    BitwiseMoveGenerator::new(four_line);
+    panic!()
+}
+
+impl BitwiseMoveGenerator {
+    pub fn new(board: FourLineBoard) -> Self {
+        BitwiseMoveGenerator {
+            cur_moves: bitwise_gen(board.board, board.piece),
+            hold_moves: bitwise_gen(board.board, board.hold()),
+        }
     }
 }
 

@@ -44,7 +44,7 @@ pub enum Spin {
     Half,
 }
 impl Mino {
-    pub fn srs_table(&self, rotation: Rotation, spin: Spin) -> [(i8, i8); 5] {
+    pub const fn srs_table(&self, rotation: Rotation, spin: Spin) -> [(i8, i8); 5] {
         // https://gist.github.com/torchlight/1832786cf053daa51bf188110b764090#file-minorotationimpl-java-L140=
         // Optimization: dont check duplicate srs multiple times
         match self {
