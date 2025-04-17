@@ -532,9 +532,9 @@ fn gen_occs(board: u64, piece: Mino) -> u64x4 {
         Mino::T => {
             u64x4::from_array([
                 board >> 10 | board_l >> 1 | board | board_r << 1 | L_WALL | R_WALL,
-                board >> 10 | board | board_r << 1 | board << 10 | FLOOR | R_WALL,
+                board >> 10 | board | board_l >> 1 | board << 10 | FLOOR | R_WALL,
                 board_l >> 1 | board | board_r << 1 | board << 10 | FLOOR | L_WALL | R_WALL,
-                board >> 10 | board_l >> 1 | board | board << 10 | FLOOR | L_WALL,
+                board >> 10 | board_r << 1 | board | board << 10 | FLOOR | L_WALL,
             ]) & board_mask
         }
         Mino::J => {
@@ -572,6 +572,19 @@ fn gen_occs(board: u64, piece: Mino) -> u64x4 {
     }
 }
 
+fn gen_heights(cleared: u8, piece: Mino) -> u64x4 {
+    let board = 0xffffffffff >> (10 * cleared);
+    match piece {
+        Mino::O => u64x4::splat(board >> 10),
+        Mino::I => u64x4::from_array([board, board >> 20, board, board >> 20]),
+        Mino::T => u64x4::from_array([board >> 10, board >> 10, board, board >> 10]),
+        Mino::J => u64x4::from_array([board >> 10, board >> 10, board, board >> 10]),
+        Mino::L => u64x4::from_array([board >> 10, board >> 10, board, board >> 10]),
+        Mino::S => u64x4::splat(board >> 10),
+        Mino::Z => u64x4::splat(board >> 10),
+    }
+}
+
 #[allow(unused)]
 fn print_bitboard(bb: u64) {
     for y in (0..4).rev() {
@@ -587,7 +600,7 @@ fn print_bitboard(bb: u64) {
     println!();
 }
 
-fn bitwise_gen(board: u64, piece: Option<Mino>) -> u64x4 {
+fn bitwise_gen(board: u64, cleared: u8, piece: Option<Mino>) -> u64x4 {
     let Some(piece) = piece else {
         return u64x4::splat(0);
     };
@@ -595,8 +608,11 @@ fn bitwise_gen(board: u64, piece: Option<Mino>) -> u64x4 {
     let (left_srs, right_srs, srs_masks) = srs_table(piece);
 
     let occs = gen_occs(board, piece);
+    let heights = gen_heights(cleared, piece);
     let mut moves = !occs & u64x4::splat(0x3FF << 30);
     let mut last = u64x4::splat(0);
+    print_bitboard(moves[2]);
+    print_bitboard(heights[2]);
 
     let left_wall = u64x4::splat(0x0040100401);
     let right_wall = u64x4::splat(0x8002080020);
@@ -623,11 +639,12 @@ fn bitwise_gen(board: u64, piece: Option<Mino>) -> u64x4 {
             };
             let mut new_moves = u64x4::splat(0);
             for test in 0..5 {
+                // TODO use the correct centers for S and Z pieces
                 let ls = left_srs[dir][test];
                 let rs = right_srs[dir][test];
                 let mask = srs_masks[dir][test];
 
-                let moved = ((rotating & mask) << ls >> rs) & !occs;
+                let moved = ((rotating & !mask) << ls >> rs) & !occs;
                 rotating &= !(moved >> ls << rs);
                 new_moves |= moved;
             }
@@ -635,14 +652,25 @@ fn bitwise_gen(board: u64, piece: Option<Mino>) -> u64x4 {
         }
     }
 
-    print_bitboard(occs[3]);
-    print_bitboard(moves[3]);
-
     // Hard drop only (no floating placements)
     // Remove squares which have placements below them.
     moves = moves & !(moves << 10);
 
-    // TODO deduplicate
+    // Remove pieces that do not fit in the board.
+    moves &= heights;
+
+    // deduplicate
+    match piece {
+        Mino::I | Mino::S | Mino::Z => {
+            moves[0] |= moves[2];
+            moves[1] |= moves[3];
+            moves[2] = 0;
+            moves[3] = 0;
+        },
+        _ => {}
+    }
+
+    print_bitboard(occs[2]);
 
     println!("Piece: {piece:?}");
 
@@ -653,8 +681,6 @@ fn bitwise_gen(board: u64, piece: Option<Mino>) -> u64x4 {
     for &bb in moves.as_array() {
         print_bitboard(bb);
     }
-
-    moves &= u64x4::splat(0xffffffffff);
 
     moves
 }
@@ -694,8 +720,8 @@ fn test_bitwise() {
 
 impl FourLineMoveGenerator for BitwiseMoveGenerator {
     fn new(board: FourLineBoard) -> Self {
-        let cur_moves = bitwise_gen(board.board, board.piece).to_array();
-        let hold_moves = bitwise_gen(board.board, board.hold()).to_array();
+        let cur_moves = bitwise_gen(board.board, board.cleared, board.piece).to_array();
+        let hold_moves = bitwise_gen(board.board, board.cleared, board.hold()).to_array();
 
         BitwiseMoveGenerator {
             cur_moves,
