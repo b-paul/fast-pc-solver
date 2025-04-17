@@ -1,6 +1,8 @@
 use crate::types::*;
 use rustc_hash::FxHashSet;
 
+use std::marker::PhantomData;
+
 /// Board is represented using a bitboard
 /// Based on wirelyre's idea
 #[derive(Copy, Clone)]
@@ -273,15 +275,19 @@ impl FourLineBoard {
     }
 }
 
-pub struct FourLineMoveGenerator {
+pub trait FourLineMoveGenerator: Iterator<Item = FourLineMove> {
+    fn new(board: FourLineBoard) -> Self;
+}
+
+pub struct SearchFourLineMoveGenerator {
     board: FourLineBoard,
     stack: Vec<FourLineMove>,
     table: FxHashSet<FourLineMove>,
     hd_table: FxHashSet<u64>,
 }
 
-impl FourLineMoveGenerator {
-    pub fn new(board: FourLineBoard) -> Self {
+impl FourLineMoveGenerator for SearchFourLineMoveGenerator {
+    fn new(board: FourLineBoard) -> Self {
         let mut stack = Vec::new();
 
         let mut table = FxHashSet::default();
@@ -312,7 +318,7 @@ impl FourLineMoveGenerator {
             table.insert(mv);
         }
 
-        FourLineMoveGenerator {
+        SearchFourLineMoveGenerator {
             board,
             stack,
             table,
@@ -321,7 +327,7 @@ impl FourLineMoveGenerator {
     }
 }
 
-impl Iterator for FourLineMoveGenerator {
+impl Iterator for SearchFourLineMoveGenerator {
     type Item = FourLineMove;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -371,8 +377,12 @@ impl Iterator for FourLineMoveGenerator {
 use std::simd::prelude::*;
 
 pub struct BitwiseMoveGenerator {
-    cur_moves: u64x4,
-    hold_moves: u64x4,
+    cur_moves: [u64; 4],
+    hold_moves: [u64; 4],
+    hold: bool,
+    idx: usize,
+    piece: Option<Mino>,
+    hold_piece: Option<Mino>,
 }
 
 fn srs_table(piece: Mino) -> ([[u64x4; 5]; 2], [[u64x4; 5]; 2], [[u64x4; 5]; 2]) {
@@ -558,6 +568,7 @@ fn gen_occs(board: u64, piece: Mino) -> u64x4 {
     }
 }
 
+#[allow(unused)]
 fn print_bitboard(bb: u64) {
     for y in (0..4).rev() {
         for x in 0..10 {
@@ -620,10 +631,13 @@ fn bitwise_gen(board: u64, piece: Option<Mino>) -> u64x4 {
         }
     }
 
-    // TODO hard drop only (no floating placements)
+    // Hard drop only (no floating placements)
+    // Remove squares which have placements below them.
+    moves = moves & (!moves << 10);
 
     // TODO deduplicate
 
+    /*
     println!("Piece: {piece:?}");
 
     println!("Board:\n");
@@ -633,6 +647,7 @@ fn bitwise_gen(board: u64, piece: Option<Mino>) -> u64x4 {
     for &bb in moves.as_array() {
         print_bitboard(bb);
     }
+    */
 
     moves
 }
@@ -640,7 +655,10 @@ fn bitwise_gen(board: u64, piece: Option<Mino>) -> u64x4 {
 #[test]
 fn test_bitwise() {
     // Queue OTJJOL
-    use super::{interface_board::Board, types::{Mino::*, CellColour::*}};
+    use super::{
+        interface_board::Board,
+        types::{CellColour::*, Mino::*},
+    };
 
     let mut board = Board {
         grid: [[CellColour::EMPTY; 10]; 40],
@@ -667,28 +685,133 @@ fn test_bitwise() {
     panic!()
 }
 
-impl BitwiseMoveGenerator {
-    pub fn new(board: FourLineBoard) -> Self {
+impl FourLineMoveGenerator for BitwiseMoveGenerator {
+    fn new(board: FourLineBoard) -> Self {
+        let cur_moves = bitwise_gen(board.board, board.piece).to_array();
+        let hold_moves = bitwise_gen(board.board, board.hold()).to_array();
+
         BitwiseMoveGenerator {
-            cur_moves: bitwise_gen(board.board, board.piece),
-            hold_moves: bitwise_gen(board.board, board.hold()),
+            cur_moves,
+            hold_moves,
+            hold: false,
+            idx: 0,
+            piece: board.piece,
+            hold_piece: board.hold(),
+        }
+    }
+}
+
+impl Iterator for BitwiseMoveGenerator {
+    type Item = FourLineMove;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.idx >= 4 {
+            return None;
+        }
+
+        let did_hold = self.hold;
+        let piece = if !self.hold {
+            self.piece
+        } else {
+            self.hold_piece
+        }?;
+        let rotation = match self.idx {
+            0 => Rotation::North,
+            1 => Rotation::East,
+            2 => Rotation::South,
+            3 => Rotation::West,
+            _ => return None,
+        };
+
+        let cur = if !self.hold {
+            &mut self.cur_moves[self.idx]
+        } else {
+            &mut self.hold_moves[self.idx]
+        };
+
+        // pop the lsb as our target square
+        let square = cur.trailing_zeros();
+        *cur = *cur & (cur.wrapping_sub(1));
+
+        let x = (square % 10) as u8;
+        let y = (square / 10) as u8;
+
+        if *cur == 0 {
+            self.idx += 1;
+            if !self.hold && self.idx >= 4 {
+                self.hold = true;
+                self.idx = 0;
+            }
+        }
+
+        Some(FourLineMove {
+            did_hold,
+            piece,
+            rotation,
+            x,
+            y,
+        })
+    }
+}
+
+struct MoveGenTester<A: FourLineMoveGenerator, B: FourLineMoveGenerator> {
+    moves: Vec<FourLineMove>,
+    _a: PhantomData<A>,
+    _b: PhantomData<B>,
+}
+
+impl<A: FourLineMoveGenerator, B: FourLineMoveGenerator> Iterator for MoveGenTester<A, B> {
+    type Item = FourLineMove;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.moves.pop()
+    }
+}
+
+impl<A: FourLineMoveGenerator, B: FourLineMoveGenerator> FourLineMoveGenerator
+    for MoveGenTester<A, B>
+{
+    fn new(board: FourLineBoard) -> Self {
+        use std::collections::HashSet;
+        let a_moves = A::new(board).collect::<HashSet<_>>();
+        let b_moves = B::new(board).collect::<HashSet<_>>();
+
+        if a_moves != b_moves {
+            print_bitboard(board.board);
+
+            println!("{:?} {:?}", board.piece, board.queue);
+
+            println!("first: {a_moves:?}");
+            println!("second: {b_moves:?}");
+
+            println!("f - s: {:?}", a_moves.difference(&b_moves));
+            println!("s - f: {:?}", b_moves.difference(&a_moves));
+
+            panic!("Not equal!");
+        }
+
+        let moves = a_moves.into_iter().collect();
+        Self {
+            moves,
+            _a: PhantomData,
+            _b: PhantomData,
         }
     }
 }
 
 impl FourLineBoard {
-    pub fn solution(&mut self) -> Option<Vec<FourLineMove>> {
+    pub fn solution<M: FourLineMoveGenerator>(&mut self) -> Option<Vec<FourLineMove>> {
         if self.solved() {
             return Some(vec![]);
         }
 
         // TODO pruning
 
-        let mut move_generator = FourLineMoveGenerator::new(*self);
+        let mut move_generator = M::new(*self);
 
         while let Some(mv) = move_generator.next() {
             let mut new_board = self.make_move(&mv);
-            if let Some(mut sol) = new_board.solution() {
+            if let Some(mut sol) = new_board.solution::<M>() {
                 let mut vec = vec![mv];
 
                 vec.append(&mut sol);
@@ -722,7 +845,7 @@ mod tests {
 
         let mut four_line = board.to_four_line().unwrap();
 
-        let solution = four_line.solution();
+        let solution = four_line.solution::<SearchFourLineMoveGenerator>();
 
         println!("Moves are: {:?}", solution);
 
@@ -752,7 +875,8 @@ mod tests {
 
         let mut four_line = board.to_four_line().unwrap();
 
-        let solution = four_line.solution();
+        let solution = four_line
+            .solution::<MoveGenTester<SearchFourLineMoveGenerator, BitwiseMoveGenerator>>();
 
         println!("Moves are: {:?}", solution);
 

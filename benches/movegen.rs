@@ -1,6 +1,6 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use fast_pc_solver::{
-    four_line_board::{BitwiseMoveGenerator, FourLineMoveGenerator},
+    four_line_board::{BitwiseMoveGenerator, FourLineMoveGenerator, SearchFourLineMoveGenerator},
     interface_board::*,
     types::CellColour::*,
     types::Mino::*,
@@ -32,7 +32,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     c.bench_function("movegen dfs", |b| {
         b.iter(|| {
-            let gen = FourLineMoveGenerator::new(four_line);
+            let gen = SearchFourLineMoveGenerator::new(four_line);
             for x in gen {
                 black_box(x);
             }
