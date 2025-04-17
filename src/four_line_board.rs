@@ -5,7 +5,7 @@ use std::marker::PhantomData;
 
 /// Board is represented using a bitboard
 /// Based on wirelyre's idea
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct FourLineBoard {
     /// The first 40 bits of this value are used to represent a 10x4 grid of cells.
     pub(crate) board: u64,
@@ -32,7 +32,7 @@ impl From<u8> for Mino {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FourLineMove {
     did_hold: bool,
     piece: Mino,
@@ -228,9 +228,11 @@ impl FourLineBoard {
 }
 
 impl FourLineBoard {
-    fn make_move(&mut self, mv: &FourLineMove) -> FourLineBoard {
+    fn make_move(self, mv: FourLineMove) -> FourLineBoard {
         let (piece_mask, min_x, min_y, _) = mv.piece_mask();
 
+        assert!(mv.x >= min_x, "mv: {:?}\nmin_x: {}", mv, min_x);
+        assert!(mv.y >= min_y, "mv: {:?}\nmin_y: {}", mv, min_y);
         let mut board = self.board | piece_mask << (10 * (mv.y - min_y) + (mv.x - min_x));
         let mut cleared = self.cleared;
 
@@ -500,18 +502,20 @@ fn srs_table(piece: Mino) -> ([[u64x4; 5]; 2], [[u64x4; 5]; 2], [[u64x4; 5]; 2])
 }
 
 fn gen_occs(board: u64, piece: Mino) -> u64x4 {
-    const LEFT_WALL: u64 = 0x0040100401;
-    const LEFT_WALL2: u64 = LEFT_WALL | LEFT_WALL << 1;
-    const RIGHT_WALL: u64 = 0x8002080020;
+    const L_WALL: u64 = 0x0040100401;
+    const L_WALL2: u64 = L_WALL | L_WALL << 1;
+    const R_WALL: u64 = 0x8020080200;
+    const FLOOR: u64 = 0x3ff;
     let board_mask: u64x4 = u64x4::splat(0xffffffffff); // maybe bad
-    let board_l2 = board & !LEFT_WALL2;
-    let board_l = board & !LEFT_WALL;
-    let board_r = board & !RIGHT_WALL;
+    let board_l2 = board & !L_WALL2;
+    let board_l = board & !L_WALL;
+    let board_r = board & !R_WALL;
     // TODO account for pieces not being allowed at walls
+    // I WISH I GENERATED THIS OH MY GOD
     match piece {
         Mino::O => {
             u64x4::from_array([
-                board | board_r << 1 | board << 10 | board_r << 11,
+                board | board_l >> 1 | board >> 10 | board_l >> 11 | R_WALL,
                 0xffffffffff,
                 0xffffffffff,
                 0xffffffffff,
@@ -519,50 +523,50 @@ fn gen_occs(board: u64, piece: Mino) -> u64x4 {
         }
         Mino::I => {
             u64x4::from_array([
-                board_l2 >> 2 | board_l >> 1 | board | board_r << 1,
-                board >> 20 | board >> 10 | board | board << 10,
-                board_l2 >> 2 | board_l >> 1 | board | board_r << 1,
-                board >> 20 | board >> 10 | board | board << 10,
+                board_l2 >> 2 | board_l >> 1 | board | board_r << 1 | L_WALL2 | R_WALL,
+                board >> 20 | board >> 10 | board | board << 10 | FLOOR,
+                board_l2 >> 2 | board_l >> 1 | board | board_r << 1 | L_WALL2 | R_WALL,
+                board >> 20 | board >> 10 | board | board << 10 | FLOOR,
             ]) & board_mask
         }
         Mino::T => {
             u64x4::from_array([
-                board >> 10 | board_l >> 1 | board | board_r << 1,
-                board >> 10 | board | board_r << 1 | board << 10,
-                board_l >> 1 | board | board_r << 1 | board << 10,
-                board >> 10 | board_l >> 1 | board | board << 10,
+                board >> 10 | board_l >> 1 | board | board_r << 1 | L_WALL | R_WALL,
+                board >> 10 | board | board_r << 1 | board << 10 | FLOOR | R_WALL,
+                board_l >> 1 | board | board_r << 1 | board << 10 | FLOOR | L_WALL | R_WALL,
+                board >> 10 | board_l >> 1 | board | board << 10 | FLOOR | L_WALL,
             ]) & board_mask
         }
         Mino::J => {
             u64x4::from_array([
-                board_l >> 11 | board_l >> 1 | board | board_r << 1,
-                board >> 10 | board_r >> 9 | board | board << 10,
-                board_l >> 1 | board | board_r << 1 | board_r << 11,
-                board >> 10 | board | board_l << 9 | board_l << 10,
+                board_r >> 9 | board_l >> 1 | board | board_r << 1 | L_WALL | R_WALL,
+                board >> 10 | board_l >> 11 | board | board << 10 | FLOOR | R_WALL,
+                board_l >> 1 | board | board_r << 1 | board_l << 9 | FLOOR | L_WALL | R_WALL,
+                board >> 10 | board | board_r << 11 | board << 10 | FLOOR | L_WALL,
             ]) & board_mask
         }
         Mino::L => {
             u64x4::from_array([
-                board_r >> 9 | board_l >> 1 | board | board_r << 1,
-                board >> 10 | board | board << 10 | board_r << 11,
-                board_l >> 1 | board | board_r << 1 | board_l << 9,
-                board_l >> 11 | board_l >> 10 | board | board << 10,
+                board_l >> 11 | board_l >> 1 | board | board_r << 1 | L_WALL | R_WALL,
+                board >> 10 | board | board << 10 | board_l << 9 | FLOOR | R_WALL,
+                board_l >> 1 | board | board_r << 1 | board_r << 11 | FLOOR | L_WALL | R_WALL,
+                board_r >> 9 | board >> 10 | board | board << 10 | FLOOR | L_WALL,
             ]) & board_mask
         }
         Mino::S => {
             u64x4::from_array([
-                board >> 10 | board_r >> 9 | board_l >> 1 | board,
-                board >> 10 | board | board_r << 1 | board_r << 11,
-                board >> 10 | board_r >> 9 | board_l >> 1 | board,
-                board >> 10 | board | board_r << 1 | board_r << 11,
+                board >> 10 | board_l >> 11 | board_r << 1 | board | L_WALL | R_WALL,
+                board >> 10 | board | board_l >> 1 | board_l << 9 | FLOOR | R_WALL,
+                board >> 10 | board_l >> 11 | board_r << 1 | board | L_WALL | R_WALL,
+                board >> 10 | board | board_l >> 1 | board_l << 9 | FLOOR | R_WALL,
             ]) & board_mask
         }
         Mino::Z => {
             u64x4::from_array([
-                board_l >> 11 | board >> 10 | board | board_r << 1,
-                board_r >> 9 | board | board_r << 1 | board << 10,
-                board_l >> 11 | board >> 10 | board | board_r << 1,
-                board_r >> 9 | board | board_r << 1 | board << 10,
+                board_r >> 9 | board >> 10 | board | board_l >> 1 | L_WALL | R_WALL,
+                board_l >> 11 | board | board_l >> 1 | board << 10 | FLOOR | R_WALL,
+                board_r >> 9 | board >> 10 | board | board_l >> 1 | L_WALL | R_WALL,
+                board_l >> 11 | board | board_l >> 1 | board << 10 | FLOOR | R_WALL,
             ]) & board_mask
         }
     }
@@ -604,9 +608,9 @@ fn bitwise_gen(board: u64, piece: Option<Mino>) -> u64x4 {
         while last_fill != moves {
             last_fill = moves;
             moves |= (moves >> 10) & !occs;
-            //moves |= ((moves & !left_wall) << 1) & !occs;
-            moves |= ((occs | (left_wall & !moves)) - moves) & !occs;
-            moves |= ((moves & !right_wall) >> 1) & !occs;
+            moves |= ((moves & !left_wall) >> 1) & !occs;
+            //moves |= ((occs | (left_wall & !moves)) - moves) & !occs;
+            moves |= ((moves & !right_wall) << 1) & !occs;
         }
 
         // please unroll this loop compiler thanks
@@ -631,13 +635,15 @@ fn bitwise_gen(board: u64, piece: Option<Mino>) -> u64x4 {
         }
     }
 
+    print_bitboard(occs[3]);
+    print_bitboard(moves[3]);
+
     // Hard drop only (no floating placements)
     // Remove squares which have placements below them.
-    moves = moves & (!moves << 10);
+    moves = moves & !(moves << 10);
 
     // TODO deduplicate
 
-    /*
     println!("Piece: {piece:?}");
 
     println!("Board:\n");
@@ -647,7 +653,8 @@ fn bitwise_gen(board: u64, piece: Option<Mino>) -> u64x4 {
     for &bb in moves.as_array() {
         print_bitboard(bb);
     }
-    */
+
+    moves &= u64x4::splat(0xffffffffff);
 
     moves
 }
@@ -705,52 +712,52 @@ impl Iterator for BitwiseMoveGenerator {
     type Item = FourLineMove;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.idx >= 4 {
-            return None;
-        }
+        while self.idx < 4 {
+            let did_hold = self.hold;
+            let piece = if !self.hold {
+                self.piece
+            } else {
+                self.hold_piece
+            }?;
+            let rotation = match self.idx {
+                0 => Rotation::North,
+                1 => Rotation::East,
+                2 => Rotation::South,
+                3 => Rotation::West,
+                _ => return None,
+            };
 
-        let did_hold = self.hold;
-        let piece = if !self.hold {
-            self.piece
-        } else {
-            self.hold_piece
-        }?;
-        let rotation = match self.idx {
-            0 => Rotation::North,
-            1 => Rotation::East,
-            2 => Rotation::South,
-            3 => Rotation::West,
-            _ => return None,
-        };
+            let cur = if !self.hold {
+                &mut self.cur_moves[self.idx]
+            } else {
+                &mut self.hold_moves[self.idx]
+            };
 
-        let cur = if !self.hold {
-            &mut self.cur_moves[self.idx]
-        } else {
-            &mut self.hold_moves[self.idx]
-        };
-
-        // pop the lsb as our target square
-        let square = cur.trailing_zeros();
-        *cur = *cur & (cur.wrapping_sub(1));
-
-        let x = (square % 10) as u8;
-        let y = (square / 10) as u8;
-
-        if *cur == 0 {
-            self.idx += 1;
-            if !self.hold && self.idx >= 4 {
-                self.hold = true;
-                self.idx = 0;
+            if *cur == 0 {
+                self.idx += 1;
+                if !self.hold && self.idx >= 4 {
+                    self.hold = true;
+                    self.idx = 0;
+                }
+                continue;
             }
-        }
 
-        Some(FourLineMove {
-            did_hold,
-            piece,
-            rotation,
-            x,
-            y,
-        })
+            // pop the lsb as our target square
+            let square = cur.trailing_zeros();
+            *cur = *cur & (cur.wrapping_sub(1));
+
+            let x = (square % 10) as u8;
+            let y = (square / 10) as u8;
+
+            return Some(FourLineMove {
+                did_hold,
+                piece,
+                rotation,
+                x,
+                y,
+            });
+        }
+        None
     }
 }
 
@@ -772,25 +779,44 @@ impl<A: FourLineMoveGenerator, B: FourLineMoveGenerator> FourLineMoveGenerator
     for MoveGenTester<A, B>
 {
     fn new(board: FourLineBoard) -> Self {
-        use std::collections::HashSet;
-        let a_moves = A::new(board).collect::<HashSet<_>>();
-        let b_moves = B::new(board).collect::<HashSet<_>>();
+        use std::collections::{BTreeMap, BTreeSet, HashSet};
+        let a_moves = A::new(board)
+            .map(|m| (board.make_move(m), m))
+            .collect::<BTreeMap<_, _>>();
+        let b_moves = B::new(board)
+            .map(|m| (board.make_move(m), m))
+            .collect::<BTreeMap<_, _>>();
 
-        if a_moves != b_moves {
+        // TODO test based on placement instead of raw move
+
+        if a_moves.keys().collect::<HashSet<_>>() != b_moves.keys().collect::<HashSet<_>>() {
             print_bitboard(board.board);
 
             println!("{:?} {:?}", board.piece, board.queue);
 
-            println!("first: {a_moves:?}");
-            println!("second: {b_moves:?}");
+            println!("first: {:?}", a_moves.values().collect::<BTreeSet<_>>());
+            println!("second: {:?}", b_moves.values().collect::<BTreeSet<_>>());
 
-            println!("f - s: {:?}", a_moves.difference(&b_moves));
-            println!("s - f: {:?}", b_moves.difference(&a_moves));
+            println!(
+                "f - s: {:?}",
+                //a_moves.difference(&b_moves).collect::<Vec<_>>()
+                a_moves
+                    .iter()
+                    .filter_map(|(b, m)| { (!b_moves.contains_key(&b)).then_some(m) })
+                    .collect::<Vec<_>>()
+            );
+            println!(
+                "s - f: {:?}",
+                b_moves
+                    .iter()
+                    .filter_map(|(b, m)| { (!a_moves.contains_key(&b)).then_some(m) })
+                    .collect::<Vec<_>>()
+            );
 
             panic!("Not equal!");
         }
 
-        let moves = a_moves.into_iter().collect();
+        let moves = a_moves.into_iter().map(|(_, m)| m).collect();
         Self {
             moves,
             _a: PhantomData,
@@ -810,7 +836,7 @@ impl FourLineBoard {
         let mut move_generator = M::new(*self);
 
         while let Some(mv) = move_generator.next() {
-            let mut new_board = self.make_move(&mv);
+            let mut new_board = self.make_move(mv);
             if let Some(mut sol) = new_board.solution::<M>() {
                 let mut vec = vec![mv];
 

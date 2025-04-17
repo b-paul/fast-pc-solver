@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CellColour {
     EMPTY,
     CYAN,
@@ -9,7 +9,7 @@ pub enum CellColour {
     GREEN,
     RED,
 }
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Mino {
     I,
     T,
@@ -19,25 +19,25 @@ pub enum Mino {
     S,
     Z,
 }
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Rotation {
     North,
     East,
     South,
     West,
 }
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ClearType {
     None,
     Mini,
     Full,
 }
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Shift {
     TapLeft,
     TapRight,
 }
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Spin {
     Clockwise,
     AntiClockwise,
