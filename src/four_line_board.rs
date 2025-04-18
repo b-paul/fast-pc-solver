@@ -169,6 +169,8 @@ impl FourLineMove {
 
 impl FourLineBoard {
     // TODO Fix this lol
+    // NOTE (18/04/2025):
+    //      fix what??!?!
     fn hold(&self) -> Option<Mino> {
         if self.hold == None {
             return match self.queue & 7 {
@@ -506,11 +508,9 @@ fn gen_occs(board: u64, piece: Mino) -> u64x4 {
     const L_WALL2: u64 = L_WALL | L_WALL << 1;
     const R_WALL: u64 = 0x8020080200;
     const FLOOR: u64 = 0x3ff;
-    let board_mask: u64x4 = u64x4::splat(0xffffffffff); // maybe bad
     let board_l2 = board & !L_WALL2;
     let board_l = board & !L_WALL;
     let board_r = board & !R_WALL;
-    // TODO account for pieces not being allowed at walls
     // I WISH I GENERATED THIS OH MY GOD
     match piece {
         Mino::O => {
@@ -519,7 +519,7 @@ fn gen_occs(board: u64, piece: Mino) -> u64x4 {
                 0xffffffffff,
                 0xffffffffff,
                 0xffffffffff,
-            ]) & board_mask
+            ])
         }
         Mino::I => {
             u64x4::from_array([
@@ -527,7 +527,7 @@ fn gen_occs(board: u64, piece: Mino) -> u64x4 {
                 board >> 20 | board >> 10 | board | board << 10 | FLOOR,
                 board_l2 >> 2 | board_l >> 1 | board | board_r << 1 | L_WALL2 | R_WALL,
                 board >> 20 | board >> 10 | board | board << 10 | FLOOR,
-            ]) & board_mask
+            ])
         }
         Mino::T => {
             u64x4::from_array([
@@ -535,7 +535,7 @@ fn gen_occs(board: u64, piece: Mino) -> u64x4 {
                 board >> 10 | board | board_l >> 1 | board << 10 | FLOOR | R_WALL,
                 board_l >> 1 | board | board_r << 1 | board << 10 | FLOOR | L_WALL | R_WALL,
                 board >> 10 | board_r << 1 | board | board << 10 | FLOOR | L_WALL,
-            ]) & board_mask
+            ])
         }
         Mino::J => {
             u64x4::from_array([
@@ -543,7 +543,7 @@ fn gen_occs(board: u64, piece: Mino) -> u64x4 {
                 board >> 10 | board_l >> 11 | board | board << 10 | FLOOR | R_WALL,
                 board_l >> 1 | board | board_r << 1 | board_l << 9 | FLOOR | L_WALL | R_WALL,
                 board >> 10 | board | board_r << 11 | board << 10 | FLOOR | L_WALL,
-            ]) & board_mask
+            ])
         }
         Mino::L => {
             u64x4::from_array([
@@ -551,23 +551,23 @@ fn gen_occs(board: u64, piece: Mino) -> u64x4 {
                 board >> 10 | board | board << 10 | board_l << 9 | FLOOR | R_WALL,
                 board_l >> 1 | board | board_r << 1 | board_r << 11 | FLOOR | L_WALL | R_WALL,
                 board_r >> 9 | board >> 10 | board | board << 10 | FLOOR | L_WALL,
-            ]) & board_mask
+            ])
         }
         Mino::S => {
             u64x4::from_array([
                 board >> 10 | board_l >> 11 | board_r << 1 | board | L_WALL | R_WALL,
                 board >> 10 | board | board_l >> 1 | board_l << 9 | FLOOR | R_WALL,
-                board >> 10 | board_l >> 11 | board_r << 1 | board | L_WALL | R_WALL,
-                board >> 10 | board | board_l >> 1 | board_l << 9 | FLOOR | R_WALL,
-            ]) & board_mask
+                board << 10 | board_r << 11 | board_l >> 1 | board | FLOOR | L_WALL | R_WALL,
+                board << 10 | board | board_r << 1 | board_r >> 9 | FLOOR | L_WALL,
+            ])
         }
         Mino::Z => {
             u64x4::from_array([
                 board_r >> 9 | board >> 10 | board | board_l >> 1 | L_WALL | R_WALL,
                 board_l >> 11 | board | board_l >> 1 | board << 10 | FLOOR | R_WALL,
-                board_r >> 9 | board >> 10 | board | board_l >> 1 | L_WALL | R_WALL,
-                board_l >> 11 | board | board_l >> 1 | board << 10 | FLOOR | R_WALL,
-            ]) & board_mask
+                board_l << 9 | board << 10 | board | board_r << 1 | FLOOR | L_WALL | R_WALL,
+                board_r << 11 | board | board_r << 1 | board >> 10 | FLOOR | L_WALL,
+            ])
         }
     }
 }
@@ -580,8 +580,8 @@ fn gen_heights(cleared: u8, piece: Mino) -> u64x4 {
         Mino::T => u64x4::from_array([board >> 10, board >> 10, board, board >> 10]),
         Mino::J => u64x4::from_array([board >> 10, board >> 10, board, board >> 10]),
         Mino::L => u64x4::from_array([board >> 10, board >> 10, board, board >> 10]),
-        Mino::S => u64x4::splat(board >> 10),
-        Mino::Z => u64x4::splat(board >> 10),
+        Mino::S => u64x4::from_array([board >> 10, board >> 10, board, board >> 10]),
+        Mino::Z => u64x4::from_array([board >> 10, board >> 10, board, board >> 10]),
     }
 }
 
@@ -611,8 +611,8 @@ fn bitwise_gen(board: u64, cleared: u8, piece: Option<Mino>) -> u64x4 {
     let heights = gen_heights(cleared, piece);
     let mut moves = !occs & u64x4::splat(0x3FF << 30);
     let mut last = u64x4::splat(0);
-    print_bitboard(moves[2]);
-    print_bitboard(heights[2]);
+    print_bitboard(moves[3]);
+    print_bitboard(heights[3]);
 
     let left_wall = u64x4::splat(0x0040100401);
     let right_wall = u64x4::splat(0x8002080020);
@@ -639,7 +639,6 @@ fn bitwise_gen(board: u64, cleared: u8, piece: Option<Mino>) -> u64x4 {
             };
             let mut new_moves = u64x4::splat(0);
             for test in 0..5 {
-                // TODO use the correct centers for S and Z pieces
                 let ls = left_srs[dir][test];
                 let rs = right_srs[dir][test];
                 let mask = srs_masks[dir][test];
@@ -656,21 +655,27 @@ fn bitwise_gen(board: u64, cleared: u8, piece: Option<Mino>) -> u64x4 {
     // Remove squares which have placements below them.
     moves = moves & !(moves << 10);
 
-    // Remove pieces that do not fit in the board.
-    moves &= heights;
-
     // deduplicate
     match piece {
-        Mino::I | Mino::S | Mino::Z => {
+        Mino::I => {
             moves[0] |= moves[2];
             moves[1] |= moves[3];
+            moves[2] = 0;
+            moves[3] = 0;
+        },
+        Mino::S | Mino::Z => {
+            moves[0] |= moves[2] >> 10;
+            moves[1] |= moves[3] >> 1;
             moves[2] = 0;
             moves[3] = 0;
         },
         _ => {}
     }
 
-    print_bitboard(occs[2]);
+    // Remove pieces that do not fit in the board.
+    moves &= heights;
+
+    print_bitboard(occs[3]);
 
     println!("Piece: {piece:?}");
 
@@ -812,8 +817,6 @@ impl<A: FourLineMoveGenerator, B: FourLineMoveGenerator> FourLineMoveGenerator
         let b_moves = B::new(board)
             .map(|m| (board.make_move(m), m))
             .collect::<BTreeMap<_, _>>();
-
-        // TODO test based on placement instead of raw move
 
         if a_moves.keys().collect::<HashSet<_>>() != b_moves.keys().collect::<HashSet<_>>() {
             print_bitboard(board.board);
