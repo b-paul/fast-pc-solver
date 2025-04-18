@@ -154,7 +154,7 @@ impl FourLineMove {
         for srs_entry in srs_table {
             let mv = FourLineMove {
                 rotation: rot,
-                x: ((self.x as i8) - srs_entry.0) as u8,
+                x: ((self.x as i8) + srs_entry.0) as u8,
                 y: ((self.y as i8) + srs_entry.1) as u8,
                 ..*self
             };
@@ -304,7 +304,7 @@ impl FourLineMoveGenerator for SearchFourLineMoveGenerator {
                 piece,
                 rotation: Rotation::North,
                 x: 5,
-                y: 4,
+                y: 5,
             };
             stack.push(mv);
             table.insert(mv);
@@ -316,7 +316,7 @@ impl FourLineMoveGenerator for SearchFourLineMoveGenerator {
                 piece,
                 rotation: Rotation::North,
                 x: 5,
-                y: 4,
+                y: 5,
             };
             stack.push(mv);
             table.insert(mv);
@@ -513,62 +513,48 @@ fn gen_occs(board: u64, piece: Mino) -> u64x4 {
     let board_r = board & !R_WALL;
     // I WISH I GENERATED THIS OH MY GOD
     match piece {
-        Mino::O => {
-            u64x4::from_array([
-                board | board_l >> 1 | board >> 10 | board_l >> 11 | R_WALL,
-                0xffffffffff,
-                0xffffffffff,
-                0xffffffffff,
-            ])
-        }
-        Mino::I => {
-            u64x4::from_array([
-                board_l2 >> 2 | board_l >> 1 | board | board_r << 1 | L_WALL2 | R_WALL,
-                board >> 20 | board >> 10 | board | board << 10 | FLOOR,
-                board_l2 >> 2 | board_l >> 1 | board | board_r << 1 | L_WALL2 | R_WALL,
-                board >> 20 | board >> 10 | board | board << 10 | FLOOR,
-            ])
-        }
-        Mino::T => {
-            u64x4::from_array([
-                board >> 10 | board_l >> 1 | board | board_r << 1 | L_WALL | R_WALL,
-                board >> 10 | board | board_l >> 1 | board << 10 | FLOOR | R_WALL,
-                board_l >> 1 | board | board_r << 1 | board << 10 | FLOOR | L_WALL | R_WALL,
-                board >> 10 | board_r << 1 | board | board << 10 | FLOOR | L_WALL,
-            ])
-        }
-        Mino::J => {
-            u64x4::from_array([
-                board_r >> 9 | board_l >> 1 | board | board_r << 1 | L_WALL | R_WALL,
-                board >> 10 | board_l >> 11 | board | board << 10 | FLOOR | R_WALL,
-                board_l >> 1 | board | board_r << 1 | board_l << 9 | FLOOR | L_WALL | R_WALL,
-                board >> 10 | board | board_r << 11 | board << 10 | FLOOR | L_WALL,
-            ])
-        }
-        Mino::L => {
-            u64x4::from_array([
-                board_l >> 11 | board_l >> 1 | board | board_r << 1 | L_WALL | R_WALL,
-                board >> 10 | board | board << 10 | board_l << 9 | FLOOR | R_WALL,
-                board_l >> 1 | board | board_r << 1 | board_r << 11 | FLOOR | L_WALL | R_WALL,
-                board_r >> 9 | board >> 10 | board | board << 10 | FLOOR | L_WALL,
-            ])
-        }
-        Mino::S => {
-            u64x4::from_array([
-                board >> 10 | board_l >> 11 | board_r << 1 | board | L_WALL | R_WALL,
-                board >> 10 | board | board_l >> 1 | board_l << 9 | FLOOR | R_WALL,
-                board << 10 | board_r << 11 | board_l >> 1 | board | FLOOR | L_WALL | R_WALL,
-                board << 10 | board | board_r << 1 | board_r >> 9 | FLOOR | L_WALL,
-            ])
-        }
-        Mino::Z => {
-            u64x4::from_array([
-                board_r >> 9 | board >> 10 | board | board_l >> 1 | L_WALL | R_WALL,
-                board_l >> 11 | board | board_l >> 1 | board << 10 | FLOOR | R_WALL,
-                board_l << 9 | board << 10 | board | board_r << 1 | FLOOR | L_WALL | R_WALL,
-                board_r << 11 | board | board_r << 1 | board >> 10 | FLOOR | L_WALL,
-            ])
-        }
+        Mino::O => u64x4::from_array([
+            board | board_l >> 1 | board >> 10 | board_l >> 11 | R_WALL,
+            0xffffffffff,
+            0xffffffffff,
+            0xffffffffff,
+        ]),
+        Mino::I => u64x4::from_array([
+            board_l2 >> 2 | board_l >> 1 | board | board_r << 1 | L_WALL2 | R_WALL,
+            board >> 20 | board >> 10 | board | board << 10 | FLOOR,
+            board_l2 >> 2 | board_l >> 1 | board | board_r << 1 | L_WALL2 | R_WALL,
+            board >> 20 | board >> 10 | board | board << 10 | FLOOR,
+        ]),
+        Mino::T => u64x4::from_array([
+            board >> 10 | board_l >> 1 | board | board_r << 1 | L_WALL | R_WALL,
+            board >> 10 | board | board_l >> 1 | board << 10 | FLOOR | R_WALL,
+            board_l >> 1 | board | board_r << 1 | board << 10 | FLOOR | L_WALL | R_WALL,
+            board >> 10 | board_r << 1 | board | board << 10 | FLOOR | L_WALL,
+        ]),
+        Mino::J => u64x4::from_array([
+            board_r >> 9 | board_l >> 1 | board | board_r << 1 | L_WALL | R_WALL,
+            board >> 10 | board_l >> 11 | board | board << 10 | FLOOR | R_WALL,
+            board_l >> 1 | board | board_r << 1 | board_l << 9 | FLOOR | L_WALL | R_WALL,
+            board >> 10 | board | board_r << 11 | board << 10 | FLOOR | L_WALL,
+        ]),
+        Mino::L => u64x4::from_array([
+            board_l >> 11 | board_l >> 1 | board | board_r << 1 | L_WALL | R_WALL,
+            board >> 10 | board | board << 10 | board_l << 9 | FLOOR | R_WALL,
+            board_l >> 1 | board | board_r << 1 | board_r << 11 | FLOOR | L_WALL | R_WALL,
+            board_r >> 9 | board >> 10 | board | board << 10 | FLOOR | L_WALL,
+        ]),
+        Mino::S => u64x4::from_array([
+            board >> 10 | board_l >> 11 | board_r << 1 | board | L_WALL | R_WALL,
+            board >> 10 | board | board_l >> 1 | board_l << 9 | FLOOR | R_WALL,
+            board << 10 | board_r << 11 | board_l >> 1 | board | FLOOR | L_WALL | R_WALL,
+            board << 10 | board | board_r << 1 | board_r >> 9 | FLOOR | L_WALL,
+        ]),
+        Mino::Z => u64x4::from_array([
+            board_r >> 9 | board >> 10 | board | board_l >> 1 | L_WALL | R_WALL,
+            board_l >> 11 | board | board_l >> 1 | board << 10 | FLOOR | R_WALL,
+            board_l << 9 | board << 10 | board | board_r << 1 | FLOOR | L_WALL | R_WALL,
+            board_r << 11 | board | board_r << 1 | board >> 10 | FLOOR | L_WALL,
+        ]),
     }
 }
 
@@ -611,8 +597,6 @@ fn bitwise_gen(board: u64, cleared: u8, piece: Option<Mino>) -> u64x4 {
     let heights = gen_heights(cleared, piece);
     let mut moves = !occs & u64x4::splat(0x3FF << 30);
     let mut last = u64x4::splat(0);
-    print_bitboard(moves[3]);
-    print_bitboard(heights[3]);
 
     let left_wall = u64x4::splat(0x0040100401);
     let right_wall = u64x4::splat(0x8002080020);
@@ -662,13 +646,13 @@ fn bitwise_gen(board: u64, cleared: u8, piece: Option<Mino>) -> u64x4 {
             moves[1] |= moves[3];
             moves[2] = 0;
             moves[3] = 0;
-        },
+        }
         Mino::S | Mino::Z => {
             moves[0] |= moves[2] >> 10;
             moves[1] |= moves[3] >> 1;
             moves[2] = 0;
             moves[3] = 0;
-        },
+        }
         _ => {}
     }
 
@@ -884,6 +868,7 @@ mod tests {
     use crate::interface_board::*;
     use crate::types::CellColour::*;
     use crate::types::Mino::*;
+
     #[test]
     fn tetris() {
         // Queue I
@@ -906,6 +891,53 @@ mod tests {
 
         assert!(solution.is_some());
     }
+
+    #[test]
+    fn srs() {
+        let mut board = Board {
+            grid: [[CellColour::EMPTY; 10]; 40],
+            hold: None,
+            piece: Z,
+            queue: vec![],
+        };
+        board.grid[3] = [
+            CYAN, CYAN, CYAN, CYAN, CYAN, CYAN, EMPTY, EMPTY, EMPTY, EMPTY,
+        ];
+        board.grid[2] = [CYAN, CYAN, CYAN, CYAN, CYAN, CYAN, EMPTY, CYAN, CYAN, CYAN];
+        board.grid[1] = [CYAN, CYAN, CYAN, CYAN, CYAN, EMPTY, EMPTY, CYAN, CYAN, CYAN];
+        board.grid[0] = [
+            CYAN, CYAN, CYAN, CYAN, EMPTY, EMPTY, EMPTY, CYAN, CYAN, CYAN,
+        ];
+
+        let four_line = board.to_four_line().unwrap();
+
+        print_bitboard(four_line.board);
+
+        let mv = FourLineMove {
+            did_hold: false,
+            piece: Z,
+            rotation: Rotation::North,
+            x: 6,
+            y: 3,
+        };
+        assert_eq!(
+            mv.rotate(&four_line, Spin::AntiClockwise),
+            Some(FourLineMove {
+                did_hold: false,
+                piece: Z,
+                rotation: Rotation::West,
+                x: 7,
+                y: 3
+            })
+        );
+
+        let moves = SearchFourLineMoveGenerator::new(four_line).collect::<Vec<_>>();
+
+        println!("Moves are: {:?}", moves);
+
+        assert!(moves.is_empty());
+    }
+
     #[test]
     fn random_jaws() {
         // Queue OTJJOL
