@@ -390,9 +390,9 @@ pub struct BitwiseMoveGenerator {
 }
 
 fn srs_table(piece: Mino) -> ([[u64x4; 5]; 2], [[u64x4; 5]; 2], [[u64x4; 5]; 2]) {
-    const LEFT_WALL: u64 = 0x0040100401;
+    const LEFT_WALL: u64 = 0x004010040100401;
     const LEFT_WALL2: u64 = LEFT_WALL | LEFT_WALL << 1;
-    const RIGHT_WALL: u64 = 0x8002080020;
+    const RIGHT_WALL: u64 = 0x802008020080200;
     const RIGHT_WALL2: u64 = RIGHT_WALL | RIGHT_WALL >> 1;
     // WHY DID I DO THIS WHAT OH MY GOD WHAT WHY AAAAAAAAAAA
 
@@ -415,50 +415,50 @@ fn srs_table(piece: Mino) -> ([[u64x4; 5]; 2], [[u64x4; 5]; 2], [[u64x4; 5]; 2])
         Mino::I => (
             [
                 [
-                    u64x4::from_array([0, 0, 0, 0]),
-                    u64x4::from_array([1, 0, 0, 2]),
-                    u64x4::from_array([0, 1, 2, 0]),
-                    u64x4::from_array([0, 0, 19, 12]),
-                    u64x4::from_array([8, 21, 0, 0]),
+                    u64x4::from_array([10, 1, 0, 0]),
+                    u64x4::from_array([11, 0, 0, 1]),
+                    u64x4::from_array([8, 2, 0, 0]),
+                    u64x4::from_array([0, 0, 11, 11]),
+                    u64x4::from_array([18, 22, 0, 0]),
                 ],
                 [
-                    u64x4::from_array([0, 0, 0, 0]),
-                    u64x4::from_array([2, 1, 0, 0]),
-                    u64x4::from_array([0, 0, 1, 2]),
-                    u64x4::from_array([12, 0, 0, 21]),
-                    u64x4::from_array([0, 8, 21, 0]),
-                ],
-            ],
-            [
-                [
-                    u64x4::from_array([0, 0, 0, 0]),
-                    u64x4::from_array([0, 2, 1, 0]),
-                    u64x4::from_array([2, 0, 0, 1]),
-                    u64x4::from_array([19, 12, 0, 0]),
-                    u64x4::from_array([0, 0, 8, 21]),
-                ],
-                [
-                    u64x4::from_array([0, 0, 0, 0]),
-                    u64x4::from_array([0, 2, 2, 1]),
-                    u64x4::from_array([1, 19, 0, 0]),
-                    u64x4::from_array([0, 0, 12, 0]),
-                    u64x4::from_array([21, 0, 0, 8]),
+                    u64x4::from_array([0, 10, 0, 0]),
+                    u64x4::from_array([1, 11, 1, 0]),
+                    u64x4::from_array([0, 8, 0, 0]),
+                    u64x4::from_array([11, 0, 0, 9]),
+                    u64x4::from_array([0, 18, 22, 0]),
                 ],
             ],
             [
                 [
-                    u64x4::from_array([0, 0, 0, 0]),
-                    u64x4::from_array([RIGHT_WALL, LEFT_WALL2, LEFT_WALL, RIGHT_WALL2]),
-                    u64x4::from_array([LEFT_WALL2, RIGHT_WALL, RIGHT_WALL2, LEFT_WALL]),
-                    u64x4::from_array([RIGHT_WALL, LEFT_WALL2, LEFT_WALL, RIGHT_WALL2]),
-                    u64x4::from_array([LEFT_WALL2, RIGHT_WALL, RIGHT_WALL2, LEFT_WALL]),
+                    u64x4::from_array([0, 0, 10, 1]),
+                    u64x4::from_array([0, 1, 11, 0]),
+                    u64x4::from_array([0, 0, 8, 2]),
+                    u64x4::from_array([9, 11, 0, 0]),
+                    u64x4::from_array([0, 0, 18, 22]),
                 ],
                 [
-                    u64x4::from_array([0, 0, 0, 0]),
-                    u64x4::from_array([RIGHT_WALL2, RIGHT_WALL, LEFT_WALL2, LEFT_WALL]),
-                    u64x4::from_array([LEFT_WALL, LEFT_WALL2, RIGHT_WALL, RIGHT_WALL2]),
-                    u64x4::from_array([RIGHT_WALL2, LEFT_WALL2, LEFT_WALL2, LEFT_WALL]),
-                    u64x4::from_array([LEFT_WALL, RIGHT_WALL, RIGHT_WALL, RIGHT_WALL2]),
+                    u64x4::from_array([1, 0, 1, 10]),
+                    u64x4::from_array([0, 0, 0, 11]),
+                    u64x4::from_array([2, 0, 2, 8]),
+                    u64x4::from_array([0, 9, 11, 0]),
+                    u64x4::from_array([22, 0, 0, 18]),
+                ],
+            ],
+            [
+                [
+                    u64x4::from_array([0, RIGHT_WALL, 0, LEFT_WALL]),
+                    u64x4::from_array([RIGHT_WALL, LEFT_WALL, LEFT_WALL, RIGHT_WALL]),
+                    u64x4::from_array([LEFT_WALL2, RIGHT_WALL2, RIGHT_WALL2, LEFT_WALL2]),
+                    u64x4::from_array([RIGHT_WALL, LEFT_WALL, LEFT_WALL, RIGHT_WALL]),
+                    u64x4::from_array([LEFT_WALL2, RIGHT_WALL2, RIGHT_WALL2, LEFT_WALL2]),
+                ],
+                [
+                    u64x4::from_array([LEFT_WALL, 0, RIGHT_WALL, 0]),
+                    u64x4::from_array([RIGHT_WALL, RIGHT_WALL, LEFT_WALL, LEFT_WALL]),
+                    u64x4::from_array([LEFT_WALL2, LEFT_WALL2, RIGHT_WALL2, RIGHT_WALL2]),
+                    u64x4::from_array([RIGHT_WALL, RIGHT_WALL, LEFT_WALL, LEFT_WALL]),
+                    u64x4::from_array([LEFT_WALL2, LEFT_WALL2, RIGHT_WALL2, RIGHT_WALL2]),
                 ],
             ],
         ),
@@ -516,12 +516,15 @@ fn srs_table(piece: Mino) -> ([[u64x4; 5]; 2], [[u64x4; 5]; 2], [[u64x4; 5]; 2])
 }
 
 fn gen_occs(board: u64, piece: Mino) -> u64x4 {
-    const L_WALL: u64 = 0x0040100401;
+    const L_WALL: u64 = 0x004010040100401;
     const L_WALL2: u64 = L_WALL | L_WALL << 1;
-    const R_WALL: u64 = 0x8020080200;
+    const R_WALL: u64 = 0x802008020080200;
+    const R_WALL2: u64 = R_WALL | R_WALL >> 1;
     const FLOOR: u64 = 0x3ff;
+    const FLOOR2: u64 = FLOOR | FLOOR << 10;
     let board_l2 = board & !L_WALL2;
     let board_l = board & !L_WALL;
+    let board_r2 = board & !R_WALL2;
     let board_r = board & !R_WALL;
     // I WISH I GENERATED THIS OH MY GOD
     match piece {
@@ -532,9 +535,9 @@ fn gen_occs(board: u64, piece: Mino) -> u64x4 {
             0xffffffffff,
         ]),
         Mino::I => u64x4::from_array([
-            board_l2 >> 2 | board_l >> 1 | board | board_r << 1 | L_WALL2 | R_WALL,
-            board >> 20 | board >> 10 | board | board << 10 | FLOOR,
-            board_l2 >> 2 | board_l >> 1 | board | board_r << 1 | L_WALL2 | R_WALL,
+            board_l2 >> 2 | board_l >> 1 | board | board_r << 1 | L_WALL | R_WALL2,
+            board >> 10 | board | board << 10 | board << 20 | FLOOR2,
+            board_l >> 1 | board | board_r << 1 | board_r2 << 2 | L_WALL2 | R_WALL,
             board >> 20 | board >> 10 | board | board << 10 | FLOOR,
         ]),
         Mino::T => u64x4::from_array([
@@ -574,7 +577,7 @@ fn gen_heights(cleared: u8, piece: Mino) -> u64x4 {
     let board = 0xffffffffff >> (10 * cleared);
     match piece {
         Mino::O => u64x4::splat(board >> 10),
-        Mino::I => u64x4::from_array([board, board >> 20, board, board >> 20]),
+        Mino::I => u64x4::from_array([board, board >> 10, board, board >> 20]),
         Mino::T => u64x4::from_array([board >> 10, board >> 10, board, board >> 10]),
         Mino::J => u64x4::from_array([board >> 10, board >> 10, board, board >> 10]),
         Mino::L => u64x4::from_array([board >> 10, board >> 10, board, board >> 10]),
@@ -610,10 +613,8 @@ fn bitwise_gen(board: u64, cleared: u8, piece: Option<Mino>) -> u64x4 {
     let mut moves = !occs & u64x4::splat(0x3FF << 40);
     let mut last = u64x4::splat(0);
 
-    print_bitboard(occs[0]);
-
-    let left_wall = u64x4::splat(0x0040100401);
-    let right_wall = u64x4::splat(0x8020080200);
+    let left_wall = u64x4::splat(0x004010040100401);
+    let right_wall = u64x4::splat(0x802008020080200);
 
     while moves != last {
         last = moves;
@@ -651,13 +652,13 @@ fn bitwise_gen(board: u64, cleared: u8, piece: Option<Mino>) -> u64x4 {
 
     // Hard drop only (no floating placements)
     // Remove squares which have placements below them.
-    moves = moves & !(moves << 10);
+    moves &= !(moves << 10);
 
     // deduplicate
     match piece {
         Mino::I => {
-            moves[0] |= moves[2];
-            moves[1] |= moves[3];
+            moves[0] |= moves[2] >> 1;
+            moves[1] |= moves[3] << 10;
             moves[2] = 0;
             moves[3] = 0;
         }
@@ -673,16 +674,16 @@ fn bitwise_gen(board: u64, cleared: u8, piece: Option<Mino>) -> u64x4 {
     // Remove pieces that do not fit in the board.
     moves &= heights;
 
-    println!("Cleared: {cleared}");
-    println!("Piece: {piece:?}");
+    //println!("Cleared: {cleared}");
+    //println!("Piece: {piece:?}");
 
-    println!("Board:\n");
-    print_bitboard(board);
+    //println!("Board:\n");
+    //print_bitboard(board);
 
-    println!("Moves: ");
-    for &bb in moves.as_array() {
-        print_bitboard(bb);
-    }
+    //println!("Moves: ");
+    //for &bb in moves.as_array() {
+        //print_bitboard(bb);
+    //}
 
     moves
 }
@@ -699,7 +700,7 @@ fn test_bitwise() {
         grid: [[CellColour::EMPTY; 10]; 40],
         hold: None,
         piece: O,
-        queue: vec![J, T, S, Z, L],
+        queue: vec![J, T, S, Z, I],
     };
     board.grid[3] = [
         CYAN, ORANGE, ORANGE, ORANGE, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY,
@@ -717,7 +718,7 @@ fn test_bitwise() {
     let four_line = board.to_four_line().unwrap();
 
     BitwiseMoveGenerator::new(four_line);
-    panic!()
+    //panic!()
 }
 
 impl FourLineMoveGenerator for BitwiseMoveGenerator {
@@ -965,7 +966,7 @@ mod tests {
             grid: [[CellColour::EMPTY; 10]; 40],
             hold: None,
             piece: O,
-            queue: vec![J, T, S, Z, L],
+            queue: vec![J, T, I, Z, L],
         };
         board.grid[3] = [
             CYAN, ORANGE, ORANGE, ORANGE, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY,
