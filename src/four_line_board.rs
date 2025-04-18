@@ -346,7 +346,7 @@ impl Iterator for SearchFourLineMoveGenerator {
                     }
                 }
             }
-            for spin in [Spin::Clockwise, Spin::AntiClockwise, Spin::Half] {
+            for spin in [Spin::Clockwise, Spin::AntiClockwise /*, Spin::Half*/] {
                 if let Some(mv) = mv.rotate(&self.board, spin) {
                     if !self.table.contains(&mv) {
                         self.stack.push(mv);
@@ -394,6 +394,18 @@ fn srs_table(piece: Mino) -> ([[u64x4; 5]; 2], [[u64x4; 5]; 2], [[u64x4; 5]; 2])
     const LEFT_WALL2: u64 = LEFT_WALL | LEFT_WALL << 1;
     const RIGHT_WALL: u64 = 0x8002080020;
     const RIGHT_WALL2: u64 = RIGHT_WALL | RIGHT_WALL >> 1;
+    // WHY DID I DO THIS WHAT OH MY GOD WHAT WHY AAAAAAAAAAA
+
+    // Ok so I *think* that the returned value is
+    // Return the tuple of tables ls, rs, masks
+    // The ls and rs tables correspond to whether we will be shifting left or right to compute this
+    // offset. If we shift left, the rs entry will be 0, and similarly for the other direction. The
+    // mask is what we get rid of before applying the shifts.
+    //
+    // The tables are indexed as follows
+    // [0]: rotation direction (cw = 0, acw = 1)
+    // [1]: srs rotation step
+    // [2]: Resulting orientation after applying this rotation (_ -> this)
     match piece {
         Mino::O => (
             [[u64x4::splat(0); 5]; 2],
@@ -403,50 +415,50 @@ fn srs_table(piece: Mino) -> ([[u64x4; 5]; 2], [[u64x4; 5]; 2], [[u64x4; 5]; 2])
         Mino::I => (
             [
                 [
-                    u64x4::from_array([0, 0, 10, 1]),
-                    u64x4::from_array([0, 1, 11, 0]),
-                    u64x4::from_array([0, 0, 8, 2]),
-                    u64x4::from_array([9, 11, 0, 0]),
-                    u64x4::from_array([0, 0, 18, 22]),
+                    u64x4::from_array([0, 0, 0, 0]),
+                    u64x4::from_array([1, 0, 1, 1]),
+                    u64x4::from_array([0, 9, 0, 11]),
+                    u64x4::from_array([0, 0, 20, 0]),
+                    u64x4::from_array([8, 0, 21, 0]),
                 ],
                 [
-                    u64x4::from_array([1, 0, 0, 10]),
-                    u64x4::from_array([0, 0, 1, 11]),
-                    u64x4::from_array([2, 19, 0, 8]),
-                    u64x4::from_array([0, 0, 9, 0]),
-                    u64x4::from_array([22, 18, 0, 18]),
-                ],
-            ],
-            [
-                [
-                    u64x4::from_array([10, 1, 0, 0]),
-                    u64x4::from_array([11, 0, 0, 1]),
-                    u64x4::from_array([8, 2, 0, 0]),
-                    u64x4::from_array([0, 0, 9, 11]),
-                    u64x4::from_array([18, 22, 0, 0]),
-                ],
-                [
-                    u64x4::from_array([0, 10, 1, 0]),
-                    u64x4::from_array([1, 11, 0, 0]),
-                    u64x4::from_array([0, 0, 2, 0]),
-                    u64x4::from_array([11, 9, 0, 9]),
-                    u64x4::from_array([0, 0, 22, 0]),
+                    u64x4::from_array([0, 0, 0, 0]),
+                    u64x4::from_array([1, 0, 0, 1]),
+                    u64x4::from_array([0, 9, 0, 11]),
+                    u64x4::from_array([20, 0, 20, 0]),
+                    u64x4::from_array([21, 0, 19, 0]),
                 ],
             ],
             [
                 [
-                    u64x4::from_array([0, LEFT_WALL, 0, RIGHT_WALL]),
-                    u64x4::from_array([LEFT_WALL, RIGHT_WALL, RIGHT_WALL, LEFT_WALL]),
-                    u64x4::from_array([RIGHT_WALL2, LEFT_WALL2, LEFT_WALL2, RIGHT_WALL2]),
-                    u64x4::from_array([LEFT_WALL, RIGHT_WALL, RIGHT_WALL, LEFT_WALL]),
-                    u64x4::from_array([RIGHT_WALL2, LEFT_WALL2, LEFT_WALL2, RIGHT_WALL2]),
+                    u64x4::from_array([0, 0, 0, 0]),
+                    u64x4::from_array([0, 1, 0, 0]),
+                    u64x4::from_array([2, 0, 9, 0]),
+                    u64x4::from_array([19, 20, 0, 20]),
+                    u64x4::from_array([0, 21, 0, 19]),
                 ],
                 [
-                    u64x4::from_array([RIGHT_WALL, 0, LEFT_WALL, 0]),
+                    u64x4::from_array([0, 0, 0, 0]),
+                    u64x4::from_array([0, 1, 1, 0]),
+                    u64x4::from_array([9, 0, 11, 0]),
+                    u64x4::from_array([0, 20, 0, 20]),
+                    u64x4::from_array([0, 21, 0, 19]),
+                ],
+            ],
+            [
+                [
+                    u64x4::from_array([0, 0, 0, 0]),
                     u64x4::from_array([LEFT_WALL, LEFT_WALL, RIGHT_WALL, RIGHT_WALL]),
-                    u64x4::from_array([RIGHT_WALL2, RIGHT_WALL2, LEFT_WALL2, LEFT_WALL2]),
                     u64x4::from_array([LEFT_WALL, LEFT_WALL, RIGHT_WALL, RIGHT_WALL]),
-                    u64x4::from_array([RIGHT_WALL2, RIGHT_WALL2, LEFT_WALL2, LEFT_WALL2]),
+                    u64x4::from_array([0, 0, 0, 0]),
+                    u64x4::from_array([LEFT_WALL, LEFT_WALL, RIGHT_WALL, RIGHT_WALL]),
+                ],
+                [
+                    u64x4::from_array([0, 0, 0, 0]),
+                    u64x4::from_array([RIGHT_WALL, LEFT_WALL, LEFT_WALL, RIGHT_WALL]),
+                    u64x4::from_array([RIGHT_WALL, LEFT_WALL, LEFT_WALL, RIGHT_WALL]),
+                    u64x4::from_array([0, 0, 0, 0]),
+                    u64x4::from_array([RIGHT_WALL, LEFT_WALL, LEFT_WALL, RIGHT_WALL]),
                 ],
             ],
         ),
@@ -454,49 +466,49 @@ fn srs_table(piece: Mino) -> ([[u64x4; 5]; 2], [[u64x4; 5]; 2], [[u64x4; 5]; 2])
             [
                 [
                     u64x4::from_array([0, 0, 0, 0]),
+                    u64x4::from_array([0, 0, 1, 1]),
+                    u64x4::from_array([0, 9, 0, 11]),
+                    u64x4::from_array([20, 0, 20, 0]),
+                    u64x4::from_array([19, 0, 21, 0]),
+                ],
+                [
+                    u64x4::from_array([0, 0, 0, 0]),
+                    u64x4::from_array([1, 0, 0, 1]),
+                    u64x4::from_array([0, 9, 0, 11]),
+                    u64x4::from_array([20, 0, 20, 0]),
+                    u64x4::from_array([21, 0, 19, 0]),
+                ],
+            ],
+            [
+                [
+                    u64x4::from_array([0, 0, 0, 0]),
                     u64x4::from_array([1, 1, 0, 0]),
                     u64x4::from_array([11, 0, 9, 0]),
-                    u64x4::from_array([0, 11, 0, 20]),
-                    u64x4::from_array([0, 0, 0, 19]),
+                    u64x4::from_array([0, 20, 0, 20]),
+                    u64x4::from_array([0, 21, 0, 19]),
                 ],
                 [
                     u64x4::from_array([0, 0, 0, 0]),
-                    u64x4::from_array([0, 0, 1, 0]),
+                    u64x4::from_array([0, 1, 1, 0]),
                     u64x4::from_array([9, 0, 11, 0]),
-                    u64x4::from_array([0, 9, 0, 20]),
-                    u64x4::from_array([0, 0, 0, 19]),
-                ],
-            ],
-            [
-                [
-                    u64x4::from_array([0, 1, 0, 0]),
-                    u64x4::from_array([0, 0, 1, 1]),
-                    u64x4::from_array([0, 2, 0, 11]),
-                    u64x4::from_array([2, 0, 20, 0]),
-                    u64x4::from_array([19, 22, 21, 0]),
-                ],
-                [
-                    u64x4::from_array([0, 10, 0, 0]),
-                    u64x4::from_array([1, 11, 0, 1]),
-                    u64x4::from_array([0, 8, 0, 11]),
-                    u64x4::from_array([20, 0, 20, 0]),
-                    u64x4::from_array([21, 18, 19, 0]),
+                    u64x4::from_array([0, 20, 0, 20]),
+                    u64x4::from_array([0, 21, 0, 19]),
                 ],
             ],
             [
                 [
                     u64x4::from_array([0, 0, 0, 0]),
-                    u64x4::from_array([RIGHT_WALL, RIGHT_WALL, LEFT_WALL, LEFT_WALL]),
-                    u64x4::from_array([RIGHT_WALL, RIGHT_WALL, LEFT_WALL, LEFT_WALL]),
+                    u64x4::from_array([LEFT_WALL, LEFT_WALL, RIGHT_WALL, RIGHT_WALL]),
+                    u64x4::from_array([LEFT_WALL, LEFT_WALL, RIGHT_WALL, RIGHT_WALL]),
                     u64x4::from_array([0, 0, 0, 0]),
-                    u64x4::from_array([RIGHT_WALL, RIGHT_WALL, LEFT_WALL, LEFT_WALL]),
+                    u64x4::from_array([LEFT_WALL, LEFT_WALL, RIGHT_WALL, RIGHT_WALL]),
                 ],
                 [
                     u64x4::from_array([0, 0, 0, 0]),
-                    u64x4::from_array([LEFT_WALL, RIGHT_WALL, RIGHT_WALL, LEFT_WALL]),
-                    u64x4::from_array([LEFT_WALL, RIGHT_WALL, RIGHT_WALL, LEFT_WALL]),
+                    u64x4::from_array([RIGHT_WALL, LEFT_WALL, LEFT_WALL, RIGHT_WALL]),
+                    u64x4::from_array([RIGHT_WALL, LEFT_WALL, LEFT_WALL, RIGHT_WALL]),
                     u64x4::from_array([0, 0, 0, 0]),
-                    u64x4::from_array([LEFT_WALL, RIGHT_WALL, RIGHT_WALL, LEFT_WALL]),
+                    u64x4::from_array([RIGHT_WALL, LEFT_WALL, LEFT_WALL, RIGHT_WALL]),
                 ],
             ],
         ),
@@ -573,7 +585,7 @@ fn gen_heights(cleared: u8, piece: Mino) -> u64x4 {
 
 #[allow(unused)]
 fn print_bitboard(bb: u64) {
-    for y in (0..4).rev() {
+    for y in (0..6).rev() {
         for x in 0..10 {
             if bb & (1 << (y * 10 + x)) != 0 {
                 print!("#");
@@ -595,11 +607,13 @@ fn bitwise_gen(board: u64, cleared: u8, piece: Option<Mino>) -> u64x4 {
 
     let occs = gen_occs(board, piece);
     let heights = gen_heights(cleared, piece);
-    let mut moves = !occs & u64x4::splat(0x3FF << 30);
+    let mut moves = !occs & u64x4::splat(0x3FF << 40);
     let mut last = u64x4::splat(0);
 
+    print_bitboard(occs[0]);
+
     let left_wall = u64x4::splat(0x0040100401);
-    let right_wall = u64x4::splat(0x8002080020);
+    let right_wall = u64x4::splat(0x8020080200);
 
     while moves != last {
         last = moves;
@@ -617,9 +631,9 @@ fn bitwise_gen(board: u64, cleared: u8, piece: Option<Mino>) -> u64x4 {
         for dir in 0..2 {
             // We will clear out the bits in rotating that pass an srs test.
             let mut rotating = if dir == 0 {
-                simd_swizzle!(moves, [1, 2, 3, 0])
-            } else {
                 simd_swizzle!(moves, [3, 0, 1, 2])
+            } else {
+                simd_swizzle!(moves, [1, 2, 3, 0])
             };
             let mut new_moves = u64x4::splat(0);
             for test in 0..5 {
@@ -659,8 +673,7 @@ fn bitwise_gen(board: u64, cleared: u8, piece: Option<Mino>) -> u64x4 {
     // Remove pieces that do not fit in the board.
     moves &= heights;
 
-    print_bitboard(occs[3]);
-
+    println!("Cleared: {cleared}");
     println!("Piece: {piece:?}");
 
     println!("Board:\n");
@@ -729,11 +742,18 @@ impl Iterator for BitwiseMoveGenerator {
     fn next(&mut self) -> Option<Self::Item> {
         while self.idx < 4 {
             let did_hold = self.hold;
-            let piece = if !self.hold {
+            let Some(piece) = (if !self.hold {
                 self.piece
             } else {
                 self.hold_piece
-            }?;
+            }) else {
+                if !self.hold {
+                    self.hold = true;
+                    continue;
+                } else {
+                    break;
+                }
+            };
             let rotation = match self.idx {
                 0 => Rotation::North,
                 1 => Rotation::East,
