@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum CellColour {
     EMPTY,
     CYAN,
@@ -9,7 +9,7 @@ pub enum CellColour {
     GREEN,
     RED,
 }
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Mino {
     I,
     T,
@@ -19,32 +19,32 @@ pub enum Mino {
     S,
     Z,
 }
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Rotation {
     North,
     East,
     South,
     West,
 }
-#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ClearType {
     None,
     Mini,
     Full,
 }
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Shift {
     TapLeft,
     TapRight,
 }
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Spin {
     Clockwise,
     AntiClockwise,
     Half,
 }
 impl Mino {
-    pub fn srs_table(&self, rotation: Rotation, spin: Spin) -> [(i8, i8); 5] {
+    pub const fn srs_table(&self, rotation: Rotation, spin: Spin) -> [(i8, i8); 5] {
         // https://gist.github.com/torchlight/1832786cf053daa51bf188110b764090#file-minorotationimpl-java-L140=
         // Optimization: dont check duplicate srs multiple times
         match self {

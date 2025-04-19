@@ -1,5 +1,11 @@
-use criterion::{criterion_group, criterion_main, Criterion};
-use fast_pc_solver::{four_line_board::*, interface_board::*, types::CellColour::*, types::Mino::*, types::*};
+use criterion::{black_box, criterion_group, criterion_main, Criterion};
+use fast_pc_solver::{
+    four_line_board::{BitwiseMoveGenerator, FourLineMoveGenerator, SearchFourLineMoveGenerator},
+    interface_board::*,
+    types::CellColour::*,
+    types::Mino::*,
+    types::*,
+};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     // Queue OTJJOL
@@ -22,11 +28,20 @@ pub fn criterion_benchmark(c: &mut Criterion) {
         CYAN, RED, GREEN, GREEN, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY,
     ];
 
-    let mut four_line = board.to_four_line().unwrap();
+    let four_line = board.to_four_line().unwrap();
 
-    c.bench_function("random jaws", |b| {
+    c.bench_function("movegen dfs", |b| {
         b.iter(|| {
-            let _ = four_line.solution::<SearchFourLineMoveGenerator>();
+            let gen = SearchFourLineMoveGenerator::new(four_line);
+            for x in gen {
+                black_box(x);
+            }
+        })
+    });
+
+    c.bench_function("movegen bitwise", |b| {
+        b.iter(|| {
+            black_box(BitwiseMoveGenerator::new(four_line));
         })
     });
 }
