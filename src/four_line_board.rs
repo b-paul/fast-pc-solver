@@ -1,4 +1,5 @@
-use crate::types::*;
+use crate::{consts::*, types::*};
+use konst::array::from_fn;
 use rustc_hash::FxHashSet;
 
 use std::marker::PhantomData;
@@ -440,129 +441,82 @@ pub struct BitwiseMoveGenerator {
     hold_piece: Option<Mino>,
 }
 
-fn srs_table(piece: Mino) -> ([[u64x4; 5]; 2], [[u64x4; 5]; 2], [[u64x4; 5]; 2]) {
+const fn srs_offset(
+    offsets: [[(i32, i32); 4]; 5],
+    rotation: usize,
+    step: usize,
+    dir: usize,
+) -> (i32, i32) {
+    let from = (dir + 3 + 2 * rotation) % 4;
+    let (ax, ay) = offsets[step][from];
+    let (bx, by) = offsets[step][dir];
+    (ax - bx, ay - by)
+}
+
+const fn table_result(
+    offsets: [[(i32, i32); 4]; 5],
+) -> ([[[u64; 4]; 5]; 2], [[[u64; 4]; 5]; 2], [[[u64; 4]; 5]; 2]) {
     const LEFT_WALL: u64 = 0x004010040100401;
     const LEFT_WALL2: u64 = LEFT_WALL | LEFT_WALL << 1;
     const RIGHT_WALL: u64 = 0x802008020080200;
     const RIGHT_WALL2: u64 = RIGHT_WALL | RIGHT_WALL >> 1;
-    // WHY DID I DO THIS WHAT OH MY GOD WHAT WHY AAAAAAAAAAA
 
-    // Ok so I *think* that the returned value is
-    // Return the tuple of tables ls, rs, masks
-    // The ls and rs tables correspond to whether we will be shifting left or right to compute this
-    // offset. If we shift left, the rs entry will be 0, and similarly for the other direction. The
-    // mask is what we get rid of before applying the shifts.
-    //
-    // The tables are indexed as follows
-    // [0]: rotation direction (cw = 0, acw = 1)
-    // [1]: srs rotation step
-    // [2]: Resulting orientation after applying this rotation (_ -> this)
+    // TODO this is still quite ugly make this look better please thank you
+    (
+        from_fn!(|rotation| {
+            from_fn!(|step| {
+                from_fn!(|dir| {
+                    let (dx, dy) = srs_offset(offsets, rotation, step, dir);
+                    let shift = dx + 10 * dy;
+                    if shift >= 0 {
+                        shift as u64
+                    } else {
+                        0
+                    }
+                })
+            })
+        }),
+        from_fn!(|rotation| {
+            from_fn!(|step| {
+                from_fn!(|dir| {
+                    let (dx, dy) = srs_offset(offsets, rotation, step, dir);
+                    let shift = dx + 10 * dy;
+                    if shift <= 0 {
+                        (-shift) as u64
+                    } else {
+                        0
+                    }
+                })
+            })
+        }),
+        from_fn!(|rotation| {
+            from_fn!(|step| {
+                from_fn!(|dir| {
+                    let (dx, _) = srs_offset(offsets, rotation, step, dir);
+                    match dx {
+                        -2 => LEFT_WALL2,
+                        -1 => LEFT_WALL,
+                        0 => 0,
+                        1 => RIGHT_WALL,
+                        2 => RIGHT_WALL2,
+                        _ => unreachable!(),
+                    }
+                })
+            })
+        }),
+    )
+}
+
+const fn srs_table(piece: Mino) -> ([[[u64; 4]; 5]; 2], [[[u64; 4]; 5]; 2], [[[u64; 4]; 5]; 2]) {
+    const I_RESULT: ([[[u64; 4]; 5]; 2], [[[u64; 4]; 5]; 2], [[[u64; 4]; 5]; 2]) =
+        table_result(I_SRS_OFFSETS);
+    const JLSTZ_RESULT: ([[[u64; 4]; 5]; 2], [[[u64; 4]; 5]; 2], [[[u64; 4]; 5]; 2]) =
+        table_result(JLSTZ_SRS_OFFSETS);
+
     match piece {
-        Mino::O => (
-            [[u64x4::splat(0); 5]; 2],
-            [[u64x4::splat(0); 5]; 2],
-            [[u64x4::splat(0); 5]; 2],
-        ),
-        Mino::I => (
-            [
-                [
-                    u64x4::from_array([10, 1, 0, 0]),
-                    u64x4::from_array([11, 0, 0, 1]),
-                    u64x4::from_array([8, 2, 0, 0]),
-                    u64x4::from_array([0, 0, 11, 11]),
-                    u64x4::from_array([18, 22, 0, 0]),
-                ],
-                [
-                    u64x4::from_array([0, 10, 0, 0]),
-                    u64x4::from_array([1, 11, 1, 0]),
-                    u64x4::from_array([0, 8, 0, 0]),
-                    u64x4::from_array([11, 0, 0, 9]),
-                    u64x4::from_array([0, 18, 22, 0]),
-                ],
-            ],
-            [
-                [
-                    u64x4::from_array([0, 0, 10, 1]),
-                    u64x4::from_array([0, 1, 11, 0]),
-                    u64x4::from_array([0, 0, 8, 2]),
-                    u64x4::from_array([9, 11, 0, 0]),
-                    u64x4::from_array([0, 0, 18, 22]),
-                ],
-                [
-                    u64x4::from_array([1, 0, 1, 10]),
-                    u64x4::from_array([0, 0, 0, 11]),
-                    u64x4::from_array([2, 0, 2, 8]),
-                    u64x4::from_array([0, 9, 11, 0]),
-                    u64x4::from_array([22, 0, 0, 18]),
-                ],
-            ],
-            [
-                [
-                    u64x4::from_array([0, RIGHT_WALL, 0, LEFT_WALL]),
-                    u64x4::from_array([RIGHT_WALL, LEFT_WALL, LEFT_WALL, RIGHT_WALL]),
-                    u64x4::from_array([LEFT_WALL2, RIGHT_WALL2, RIGHT_WALL2, LEFT_WALL2]),
-                    u64x4::from_array([RIGHT_WALL, LEFT_WALL, LEFT_WALL, RIGHT_WALL]),
-                    u64x4::from_array([LEFT_WALL2, RIGHT_WALL2, RIGHT_WALL2, LEFT_WALL2]),
-                ],
-                [
-                    u64x4::from_array([LEFT_WALL, 0, RIGHT_WALL, 0]),
-                    u64x4::from_array([RIGHT_WALL, RIGHT_WALL, LEFT_WALL, LEFT_WALL]),
-                    u64x4::from_array([LEFT_WALL2, LEFT_WALL2, RIGHT_WALL2, RIGHT_WALL2]),
-                    u64x4::from_array([RIGHT_WALL, RIGHT_WALL, LEFT_WALL, LEFT_WALL]),
-                    u64x4::from_array([LEFT_WALL2, LEFT_WALL2, RIGHT_WALL2, RIGHT_WALL2]),
-                ],
-            ],
-        ),
-        _ => (
-            [
-                [
-                    u64x4::from_array([0, 0, 0, 0]),
-                    u64x4::from_array([0, 0, 1, 1]),
-                    u64x4::from_array([0, 9, 0, 11]),
-                    u64x4::from_array([20, 0, 20, 0]),
-                    u64x4::from_array([19, 0, 21, 0]),
-                ],
-                [
-                    u64x4::from_array([0, 0, 0, 0]),
-                    u64x4::from_array([1, 0, 0, 1]),
-                    u64x4::from_array([0, 9, 0, 11]),
-                    u64x4::from_array([20, 0, 20, 0]),
-                    u64x4::from_array([21, 0, 19, 0]),
-                ],
-            ],
-            [
-                [
-                    u64x4::from_array([0, 0, 0, 0]),
-                    u64x4::from_array([1, 1, 0, 0]),
-                    u64x4::from_array([11, 0, 9, 0]),
-                    u64x4::from_array([0, 20, 0, 20]),
-                    u64x4::from_array([0, 21, 0, 19]),
-                ],
-                [
-                    u64x4::from_array([0, 0, 0, 0]),
-                    u64x4::from_array([0, 1, 1, 0]),
-                    u64x4::from_array([9, 0, 11, 0]),
-                    u64x4::from_array([0, 20, 0, 20]),
-                    u64x4::from_array([0, 21, 0, 19]),
-                ],
-            ],
-            [
-                [
-                    u64x4::from_array([0, 0, 0, 0]),
-                    u64x4::from_array([LEFT_WALL, LEFT_WALL, RIGHT_WALL, RIGHT_WALL]),
-                    u64x4::from_array([LEFT_WALL, LEFT_WALL, RIGHT_WALL, RIGHT_WALL]),
-                    u64x4::from_array([0, 0, 0, 0]),
-                    u64x4::from_array([LEFT_WALL, LEFT_WALL, RIGHT_WALL, RIGHT_WALL]),
-                ],
-                [
-                    u64x4::from_array([0, 0, 0, 0]),
-                    u64x4::from_array([RIGHT_WALL, LEFT_WALL, LEFT_WALL, RIGHT_WALL]),
-                    u64x4::from_array([RIGHT_WALL, LEFT_WALL, LEFT_WALL, RIGHT_WALL]),
-                    u64x4::from_array([0, 0, 0, 0]),
-                    u64x4::from_array([RIGHT_WALL, LEFT_WALL, LEFT_WALL, RIGHT_WALL]),
-                ],
-            ],
-        ),
+        Mino::O => ([[[0; 4]; 5]; 2], [[[0; 4]; 5]; 2], [[[0; 4]; 5]; 2]),
+        Mino::I => I_RESULT,
+        _ => JLSTZ_RESULT,
     }
 }
 
@@ -689,9 +643,9 @@ fn bitwise_gen(board: u64, cleared: u8, piece: Option<Mino>) -> u64x4 {
             };
             let mut new_moves = u64x4::splat(0);
             for test in 0..5 {
-                let ls = left_srs[dir][test];
-                let rs = right_srs[dir][test];
-                let mask = srs_masks[dir][test];
+                let ls = u64x4::from_array(left_srs[dir][test]);
+                let rs = u64x4::from_array(right_srs[dir][test]);
+                let mask = u64x4::from_array(srs_masks[dir][test]);
 
                 let moved = ((rotating & !mask) << ls >> rs) & !occs;
                 rotating &= !(moved >> ls << rs);
