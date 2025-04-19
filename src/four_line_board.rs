@@ -18,6 +18,57 @@ pub struct FourLineBoard {
     pub(crate) cleared: u8,
 }
 
+pub fn bitboard_from_string(s: &str) -> u64 {
+    let s = s.trim();
+    let mut r = 0;
+    assert!(
+        s.lines().count() <= 6,
+        "Bitboards can be at most 6 lines long."
+    );
+    for l in s.lines() {
+        let l = l.trim();
+        assert!(
+            l.len() == 10,
+            "Bitboard lines must be exactly 10 characters long"
+        );
+        for c in l.chars().rev() {
+            r <<= 1;
+            match c {
+                '#' => r |= 1,
+                '.' => r |= 0,
+                _ => panic!(
+                    "Character {c} is not a valid square in a bitboard (only # or . are valid)"
+                ),
+            }
+        }
+    }
+    r
+}
+
+pub fn queue_from_vec(v: Vec<Mino>) -> u32 {
+    assert!(
+        v.len() <= 10,
+        "Queues in FourLineBoards can have at most 10 pieces."
+    );
+
+    let mut queue = u32::MAX;
+
+    for piece in v.iter().rev() {
+        queue <<= 3;
+        queue |= match piece {
+            Mino::I => 0,
+            Mino::T => 1,
+            Mino::O => 2,
+            Mino::J => 3,
+            Mino::L => 4,
+            Mino::S => 5,
+            Mino::Z => 6,
+        }
+    }
+
+    queue
+}
+
 impl From<u8> for Mino {
     fn from(n: u8) -> Mino {
         [
@@ -682,7 +733,7 @@ fn bitwise_gen(board: u64, cleared: u8, piece: Option<Mino>) -> u64x4 {
 
     //println!("Moves: ");
     //for &bb in moves.as_array() {
-        //print_bitboard(bb);
+    //print_bitboard(bb);
     //}
 
     moves
@@ -826,7 +877,7 @@ impl<A: FourLineMoveGenerator, B: FourLineMoveGenerator> FourLineMoveGenerator
         if a_moves.keys().collect::<HashSet<_>>() != b_moves.keys().collect::<HashSet<_>>() {
             print_bitboard(board.board);
 
-            println!("{:?} {:?}", board.piece, board.queue);
+            println!("{:?} {:?} {:?}", board.piece, board.hold, board.queue);
 
             println!("first: {:?}", a_moves.values().collect::<BTreeSet<_>>());
             println!("second: {:?}", b_moves.values().collect::<BTreeSet<_>>());
@@ -959,35 +1010,71 @@ mod tests {
         assert!(moves.is_empty());
     }
 
+    fn test_board(board: u64, queues: Vec<(Option<Mino>, Option<Mino>, Vec<Mino>)>) {
+        for (piece, hold, queue) in queues {
+            let mut board = FourLineBoard {
+                board,
+                hold,
+                piece,
+                queue: queue_from_vec(queue),
+                cleared: 0,
+            };
+
+            let _ = board
+                .solution::<MoveGenTester<SearchFourLineMoveGenerator, BitwiseMoveGenerator>>();
+        }
+    }
+
     #[test]
-    fn random_jaws() {
-        // Queue OTJJOL
-        let mut board = Board {
-            grid: [[CellColour::EMPTY; 10]; 40],
-            hold: None,
-            piece: O,
-            queue: vec![J, T, I, Z, L],
-        };
-        board.grid[3] = [
-            CYAN, ORANGE, ORANGE, ORANGE, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY,
-        ];
-        board.grid[2] = [
-            CYAN, ORANGE, RED, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY,
-        ];
-        board.grid[1] = [
-            CYAN, RED, RED, GREEN, GREEN, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY,
-        ];
-        board.grid[0] = [
-            CYAN, RED, GREEN, GREEN, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY, EMPTY,
+    fn boards() {
+        let board = bitboard_from_string(
+            "
+            ####......
+            ###.......
+            #####.....
+            ####......
+            ",
+        );
+
+        let queues = vec![
+            (Some(O), None, vec![J, T, I, Z, L]),
+            // (Some(S), None, vec![J, T, I, I, I]), // breaks
+            // (Some(Z), None, vec![T, L, O, O, S]), // breaks
+            // (Some(O), None, vec![Z, T, L, I, O]), // breaks
         ];
 
-        let mut four_line = board.to_four_line().unwrap();
+        test_board(board, queues);
 
-        let solution = four_line
-            .solution::<MoveGenTester<SearchFourLineMoveGenerator, BitwiseMoveGenerator>>();
+        let board = bitboard_from_string(
+            "
+            ###.......
+            ###.......
+            ####......
+            ######....
+            ",
+        );
 
-        println!("Moves are: {:?}", solution);
+        let queues = vec![
+            // (Some(S), None, vec![T, J, I, O, L]), // breaks
+            // (Some(O), None, vec![L, O, I, T, J]), // breaks
+        ];
 
-        assert!(solution.is_some());
+        test_board(board, queues);
+
+        let board = bitboard_from_string(
+            "
+            #.......##
+            #........#
+            ###.....##
+            ###....###
+            ",
+        );
+
+        let queues = vec![
+            // (Some(Z), None, vec![J, S, I, O, L]), // breaks
+            // (Some(J), None, vec![S, T, Z, L, I]), // breaks
+        ];
+
+        test_board(board, queues);
     }
 }
