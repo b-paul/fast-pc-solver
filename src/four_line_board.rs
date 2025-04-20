@@ -455,11 +455,11 @@ pub struct BitwiseMoveGenerator {
 }
 
 const fn srs_offset(
-    offsets: [[(i32, i32); 4]; 5],
+    offsets: [[(i8, i8); 4]; 5],
     rotation: usize,
     step: usize,
     dir: usize,
-) -> (i32, i32) {
+) -> (i8, i8) {
     let from = (dir + 3 + 2 * rotation) % 4;
     let (ax, ay) = offsets[step][from];
     let (bx, by) = offsets[step][dir];
@@ -467,8 +467,8 @@ const fn srs_offset(
 }
 
 const fn table_result(
-    offsets: [[(i32, i32); 4]; 5],
-) -> ([[[u64; 4]; 5]; 2], [[[u64; 4]; 5]; 2], [[[u64; 4]; 5]; 2]) {
+    offsets: [[(i8, i8); 4]; 5],
+) -> ([[[u8; 4]; 5]; 2], [[[u8; 4]; 5]; 2], [[[u64; 4]; 5]; 2]) {
     const LEFT_WALL: u64 = 0x004010040100401;
     const LEFT_WALL2: u64 = LEFT_WALL | LEFT_WALL << 1;
     const RIGHT_WALL: u64 = 0x802008020080200;
@@ -482,7 +482,7 @@ const fn table_result(
                     let (dx, dy) = srs_offset(offsets, rotation, step, dir);
                     let shift = dx + 10 * dy;
                     if shift >= 0 {
-                        shift as u64
+                        shift as u8
                     } else {
                         0
                     }
@@ -495,7 +495,7 @@ const fn table_result(
                     let (dx, dy) = srs_offset(offsets, rotation, step, dir);
                     let shift = dx + 10 * dy;
                     if shift <= 0 {
-                        (-shift) as u64
+                        (-shift) as u8
                     } else {
                         0
                     }
@@ -520,10 +520,10 @@ const fn table_result(
     )
 }
 
-const fn srs_table(piece: Mino) -> ([[[u64; 4]; 5]; 2], [[[u64; 4]; 5]; 2], [[[u64; 4]; 5]; 2]) {
-    const I_RESULT: ([[[u64; 4]; 5]; 2], [[[u64; 4]; 5]; 2], [[[u64; 4]; 5]; 2]) =
+const fn srs_table(piece: Mino) -> ([[[u8; 4]; 5]; 2], [[[u8; 4]; 5]; 2], [[[u64; 4]; 5]; 2]) {
+    const I_RESULT: ([[[u8; 4]; 5]; 2], [[[u8; 4]; 5]; 2], [[[u64; 4]; 5]; 2]) =
         table_result(I_SRS_OFFSETS);
-    const JLSTZ_RESULT: ([[[u64; 4]; 5]; 2], [[[u64; 4]; 5]; 2], [[[u64; 4]; 5]; 2]) =
+    const JLSTZ_RESULT: ([[[u8; 4]; 5]; 2], [[[u8; 4]; 5]; 2], [[[u64; 4]; 5]; 2]) =
         table_result(JLSTZ_SRS_OFFSETS);
 
     match piece {
@@ -656,8 +656,8 @@ fn bitwise_gen(board: u64, cleared: u8, piece: Option<Mino>) -> u64x4 {
             };
             let mut new_moves = u64x4::splat(0);
             for test in 0..5 {
-                let ls = u64x4::from_array(left_srs[dir][test]);
-                let rs = u64x4::from_array(right_srs[dir][test]);
+                let ls = u8x4::from_array(left_srs[dir][test]).cast();
+                let rs = u8x4::from_array(right_srs[dir][test]).cast();
                 let mask = u64x4::from_array(srs_masks[dir][test]);
 
                 let moved = ((rotating & !mask) << ls >> rs) & !occs;
