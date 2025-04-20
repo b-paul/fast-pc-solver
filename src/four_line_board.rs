@@ -27,6 +27,32 @@ pub struct FourLineBoard {
     pub(crate) cleared: u8,
 }
 
+// TODO Bitboard struct
+/// Read a bitboard from a string. Trailing and leading whitespace is ignored. Bitboards are read
+/// as rows of '#'s and '.'s. Each row has exactly 10 of these characters, and each board has at
+/// most 6 rows. The output of a call to `print_bitboard` is a valid input to this function.
+///
+/// # Examples
+///
+/// ```
+/// # use fast_pc_solver::four_line_board::bitboard_from_string;
+/// let bb = bitboard_from_string("
+/// ..........
+/// ..........
+/// ..........
+/// ..........
+/// ");
+/// assert_eq!(bb, 0);
+///
+/// let bb = bitboard_from_string("
+/// #.........
+/// #.........
+/// #.........
+/// #.........
+/// ");
+/// assert_eq!(bb, 0x0040100401);
+/// ```
+///
 pub fn bitboard_from_string(s: &str) -> u64 {
     let s = s.trim();
     let mut r = 0;
@@ -54,6 +80,24 @@ pub fn bitboard_from_string(s: &str) -> u64 {
     r
 }
 
+// TODO queue struct instead of this thing lol
+/// Converts a vector of minos into a queue as represented in a `FourLineBoard`. Queues
+/// are represented as a 32 bit integer. In this representation, the pieces are stored in groups of
+/// 3 bits, where each 3 bits encodes a piece. Since at most 10 pieces can be stored, it is
+/// required that the input vector contains at most 10 minos. Empty entries into the queue are
+/// represented with all 1s.
+///
+/// # Examples
+///
+/// ```
+/// # use fast_pc_solver::four_line_board::queue_from_vec;
+/// # use fast_pc_solver::types::Mino::*;
+/// let q = queue_from_vec(vec![]);
+/// assert_eq!(q, u32::MAX);
+///
+/// let q = queue_from_vec(vec![I, T, S, Z]);
+/// assert_eq!(q, u32::MAX << 12 | 6 << 9 | 5 << 6 | 1 << 3 | 0);
+/// ```
 pub fn queue_from_vec(v: Vec<Mino>) -> u32 {
     assert!(
         v.len() <= 10,
@@ -92,6 +136,9 @@ impl From<u8> for Mino {
     }
 }
 
+// TODO consider not using `FourLineMove`s and instead return new `FourLineBoard`s when generating
+// moves.
+/// A move that can be made on a `FourLineBoard`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct FourLineMove {
     did_hold: bool,
@@ -102,7 +149,9 @@ pub struct FourLineMove {
 }
 
 impl FourLineMove {
-    /// Piece mask, min x, min y, max x
+    // TODO don't do this lol
+    /// Returns a mask representation of the piece this move will place, at the left most position,
+    /// then its minimum x coordinate, minimum y coordinate, and maximum x coordinate values.
     fn piece_mask(&self) -> (u64, u8, u8, u8) {
         match self.piece {
             Mino::I => match self.rotation {
@@ -150,6 +199,7 @@ impl FourLineMove {
         }
     }
 
+    /// Determines whether the given move places a piece within the bounds of a four line board.
     fn is_four_line(&self, board: &FourLineBoard) -> bool {
         let piece_height = match self.piece {
             Mino::I => match self.rotation {
@@ -175,6 +225,7 @@ impl FourLineMove {
         self.y + piece_height < 4 - board.cleared
     }
 
+    /// Determine whether the given move will result in a collision with the board.
     fn collision(&self, board: &FourLineBoard) -> bool {
         let (mut mask, min_x, min_y, max_x) = self.piece_mask();
 
@@ -191,6 +242,7 @@ impl FourLineMove {
         (mask & board.board) != 0
     }
 
+    /// Attempt to apply the specified shift to this move to get a new move.
     fn shift(&self, board: &FourLineBoard, shift: Shift) -> Option<Self> {
         let shift = match shift {
             Shift::TapRight => 1,
@@ -206,6 +258,8 @@ impl FourLineMove {
         Some(mv)
     }
 
+    /// Attempt to apply the specified rotation to this move to get a new move, applying SRS
+    /// kick rules.
     fn rotate(&self, board: &FourLineBoard, rotation: Spin) -> Option<Self> {
         let rot = self.rotation.apply(&rotation);
 
@@ -243,6 +297,7 @@ impl FourLineBoard {
     // TODO Fix this lol
     // NOTE (18/04/2025):
     //      fix what??!?!
+    /// Return the resulting piece after applying a hold, if there is anything left in the queue.
     fn hold(&self) -> Option<Mino> {
         if self.hold == None {
             return match self.queue & 7 {
@@ -259,6 +314,7 @@ impl FourLineBoard {
         self.hold
     }
 
+    /// Return the next piece in the queue
     fn next_piece(&self) -> Option<Mino> {
         match self.queue & 7 {
             0 => Some(Mino::I),
@@ -272,6 +328,7 @@ impl FourLineBoard {
         }
     }
 
+    /// Return the 2nd piece in the queue
     fn next_next_piece(&self) -> Option<Mino> {
         match (self.queue >> 3) & 7 {
             0 => Some(Mino::I),
@@ -285,6 +342,7 @@ impl FourLineBoard {
         }
     }
 
+    /// Return the y position of the given move after performing a hard drop.
     fn drop_y(&self, mv: FourLineMove) -> u8 {
         let (mut mask, min_x, min_y, _) = mv.piece_mask();
 
@@ -302,11 +360,12 @@ impl FourLineBoard {
 }
 
 impl FourLineBoard {
+    /// Apply the given move to get a new board.
     fn make_move(self, mv: FourLineMove) -> FourLineBoard {
         let (piece_mask, min_x, min_y, _) = mv.piece_mask();
 
-        assert!(mv.x >= min_x, "mv: {:?}\nmin_x: {}", mv, min_x);
-        assert!(mv.y >= min_y, "mv: {:?}\nmin_y: {}", mv, min_y);
+        debug_assert!(mv.x >= min_x, "mv: {:?}\nmin_x: {}", mv, min_x);
+        debug_assert!(mv.y >= min_y, "mv: {:?}\nmin_y: {}", mv, min_y);
         let mut board = self.board | piece_mask << (10 * (mv.y - min_y) + (mv.x - min_x));
         let mut cleared = self.cleared;
 
@@ -344,6 +403,7 @@ impl FourLineBoard {
         }
     }
 
+    /// Determines whether a perfect clear has been found
     fn solved(&self) -> bool {
         debug_assert!(self.cleared <= 4);
 
@@ -351,10 +411,14 @@ impl FourLineBoard {
     }
 }
 
+/// An implementation of a move generation algorithm. Implementors should be able to iterate over
+/// all moves that can be made on its input board.
 pub trait FourLineMoveGenerator: Iterator<Item = FourLineMove> {
+    /// Create a generator which will generate moves for the given board.
     fn new(board: FourLineBoard) -> Self;
 }
 
+/// A move generator that performs a DFS incrementally until all moves are found.
 pub struct SearchFourLineMoveGenerator {
     board: FourLineBoard,
     stack: Vec<FourLineMove>,
@@ -453,6 +517,9 @@ impl Iterator for SearchFourLineMoveGenerator {
 
 use std::simd::prelude::*;
 
+// TODO explain this properly
+/// A move generator that uses epic bit manipulation tricks and stuff and simd and is really cool
+/// and super fast
 pub struct BitwiseMoveGenerator {
     cur_moves: [u64; 4],
     hold_moves: [u64; 4],
@@ -462,7 +529,8 @@ pub struct BitwiseMoveGenerator {
     hold_piece: Option<Mino>,
 }
 
-const fn srs_offset(
+/// Computes srs kick data from srs offsets
+const fn srs_data(
     offsets: [[(i8, i8); 4]; 5],
     rotation: usize,
     step: usize,
@@ -474,6 +542,7 @@ const fn srs_offset(
     (ax - bx, ay - by)
 }
 
+/// Computes an srs kick data table given an srs offset table
 const fn table_result(
     offsets: [[(i8, i8); 4]; 5],
 ) -> ([[[u8; 4]; 5]; 2], [[[u8; 4]; 5]; 2], [[[u64; 4]; 5]; 2]) {
@@ -482,7 +551,7 @@ const fn table_result(
         from_fn!(|rotation| {
             from_fn!(|step| {
                 from_fn!(|dir| {
-                    let (dx, dy) = srs_offset(offsets, rotation, step, dir);
+                    let (dx, dy) = srs_data(offsets, rotation, step, dir);
                     let shift = dx + 10 * dy;
                     if shift >= 0 {
                         shift as u8
@@ -495,7 +564,7 @@ const fn table_result(
         from_fn!(|rotation| {
             from_fn!(|step| {
                 from_fn!(|dir| {
-                    let (dx, dy) = srs_offset(offsets, rotation, step, dir);
+                    let (dx, dy) = srs_data(offsets, rotation, step, dir);
                     let shift = dx + 10 * dy;
                     if shift <= 0 {
                         (-shift) as u8
@@ -508,7 +577,7 @@ const fn table_result(
         from_fn!(|rotation| {
             from_fn!(|step| {
                 from_fn!(|dir| {
-                    let (dx, _) = srs_offset(offsets, rotation, step, dir);
+                    let (dx, _) = srs_data(offsets, rotation, step, dir);
                     match dx {
                         -2 => L_WALL2,
                         -1 => L_WALL,
@@ -523,6 +592,7 @@ const fn table_result(
     )
 }
 
+/// Gets the srs table of the given piece. TODO can I be bothered explaining the type signature?!
 const fn srs_table(piece: Mino) -> ([[[u8; 4]; 5]; 2], [[[u8; 4]; 5]; 2], [[[u64; 4]; 5]; 2]) {
     const I_RESULT: ([[[u8; 4]; 5]; 2], [[[u8; 4]; 5]; 2], [[[u64; 4]; 5]; 2]) =
         table_result(I_SRS_OFFSETS);
@@ -536,6 +606,7 @@ const fn srs_table(piece: Mino) -> ([[[u8; 4]; 5]; 2], [[[u8; 4]; 5]; 2], [[[u64
     }
 }
 
+/// Compute the relevant occupancy marks for valid piece center squares.
 fn gen_occs(board: u64, piece: Mino) -> u64x4 {
     let board_l2 = board & !L_WALL2;
     let board_l = board & !L_WALL;
@@ -588,6 +659,8 @@ fn gen_occs(board: u64, piece: Mino) -> u64x4 {
     }
 }
 
+/// Generate masks of valid piece placements in a four line board accounting for the maximum
+/// height of `four - cleared`.
 fn gen_heights(cleared: u8, piece: Mino) -> u64x4 {
     let board = 0xffffffffff >> (10 * cleared);
     match piece {
@@ -601,6 +674,7 @@ fn gen_heights(cleared: u8, piece: Mino) -> u64x4 {
     }
 }
 
+/// Print a bitboard as a grid of '#'s and '.'s.
 #[allow(unused)]
 fn print_bitboard(bb: u64) {
     for y in (0..6).rev() {
@@ -616,33 +690,39 @@ fn print_bitboard(bb: u64) {
     println!();
 }
 
-fn bitwise_gen(board: u64, cleared: u8, piece: Option<Mino>) -> u64x4 {
+/// Generate a vector of boards representing valid piece placements.
+fn bitwise_gen(board: u64, cleared: u8, piece: Option<Mino>) -> [u64; 4] {
     let Some(piece) = piece else {
-        return u64x4::splat(0);
+        return [0; 4];
     };
 
     let (left_srs, right_srs, srs_masks) = srs_table(piece);
 
     let occs = gen_occs(board, piece);
     let heights = gen_heights(cleared, piece);
+    // Start with the pieces above the board. We work with a simd vector of 4 boards, representing
+    // each rotation of the piece.
     let mut moves = !occs & u64x4::splat(0x3FF << 40);
     let mut last = u64x4::splat(0);
 
     let left_wall = u64x4::splat(0x004010040100401);
     let right_wall = u64x4::splat(0x802008020080200);
 
+    // We will repeatedly try and find new moves until no new moves are found.
     while moves != last {
         last = moves;
 
+        // The first step is to find all shifts and soft drops. This is done with a bitwise flood
+        // fill!
         let mut last_fill = u64x4::splat(0);
         while last_fill != moves {
             last_fill = moves;
             moves |= (moves >> 10) & !occs;
             moves |= ((moves & !left_wall) >> 1) & !occs;
-            //moves |= ((occs | (left_wall & !moves)) - moves) & !occs;
             moves |= ((moves & !right_wall) << 1) & !occs;
         }
 
+        // Next we do rotations, applying srs kick rules.
         // please unroll this loop compiler thanks
         for dir in 0..2 {
             // We will clear out the bits in rotating that pass an srs test.
@@ -665,11 +745,11 @@ fn bitwise_gen(board: u64, cleared: u8, piece: Option<Mino>) -> u64x4 {
         }
     }
 
-    // Hard drop only (no floating placements)
-    // Remove squares which have placements below them.
+    // We allow hard drops only (no floating placements). To do this we remove squares which have
+    // placements below them.
     moves &= !(moves << 10);
 
-    // deduplicate
+    // Remove moves which place pieces the same way
     match piece {
         Mino::I => {
             moves[0] |= moves[2] >> 1;
@@ -689,20 +769,10 @@ fn bitwise_gen(board: u64, cleared: u8, piece: Option<Mino>) -> u64x4 {
     // Remove pieces that do not fit in the board.
     moves &= heights;
 
-    //println!("Cleared: {cleared}");
-    //println!("Piece: {piece:?}");
-
-    //println!("Board:\n");
-    //print_bitboard(board);
-
-    //println!("Moves: ");
-    //for &bb in moves.as_array() {
-    //print_bitboard(bb);
-    //}
-
-    moves
+    moves.to_array()
 }
 
+/*
 #[test]
 fn test_bitwise() {
     // Queue OTJJOL
@@ -733,14 +803,14 @@ fn test_bitwise() {
     let four_line = board.to_four_line().unwrap();
 
     BitwiseMoveGenerator::new(four_line);
-    //panic!()
 }
+*/
 
 impl FourLineMoveGenerator for BitwiseMoveGenerator {
     fn new(board: FourLineBoard) -> Self {
-        let cur_moves = bitwise_gen(board.board, board.cleared, board.piece).to_array();
+        let cur_moves = bitwise_gen(board.board, board.cleared, board.piece);
         let hold_moves = if board.piece != board.hold() {
-            bitwise_gen(board.board, board.cleared, board.hold()).to_array()
+            bitwise_gen(board.board, board.cleared, board.hold())
         } else {
             [0; 4]
         };
@@ -816,6 +886,8 @@ impl Iterator for BitwiseMoveGenerator {
     }
 }
 
+/// A move generator which runs two move generators, and compares their results. The purpose of
+/// this is to test that two generators have equivalent behaviour.
 struct MoveGenTester<A: FourLineMoveGenerator, B: FourLineMoveGenerator> {
     moves: Vec<FourLineMove>,
     _a: PhantomData<A>,
@@ -881,6 +953,8 @@ impl<A: FourLineMoveGenerator, B: FourLineMoveGenerator> FourLineMoveGenerator
 }
 
 impl FourLineBoard {
+    /// Find for a perfect clear with a brute force search. Optionally allow pruning for a speedup
+    /// (noting that it currently has not been rigorously tested!)
     pub fn solution<M: FourLineMoveGenerator, const PRUNE: bool>(
         &mut self,
     ) -> Option<Vec<FourLineMove>> {
