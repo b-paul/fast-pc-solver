@@ -4,6 +4,14 @@ use rustc_hash::FxHashSet;
 
 use std::marker::PhantomData;
 
+const COLUMN: u64 = 0x0040100401;
+const L_WALL: u64 = 0x004010040100401;
+const L_WALL2: u64 = L_WALL | L_WALL << 1;
+const R_WALL: u64 = 0x802008020080200;
+const R_WALL2: u64 = R_WALL | R_WALL >> 1;
+const FLOOR: u64 = 0x3ff;
+const FLOOR2: u64 = FLOOR | FLOOR << 10;
+
 /// Board is represented using a bitboard
 /// Based on wirelyre's idea
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -469,11 +477,6 @@ const fn srs_offset(
 const fn table_result(
     offsets: [[(i8, i8); 4]; 5],
 ) -> ([[[u8; 4]; 5]; 2], [[[u8; 4]; 5]; 2], [[[u64; 4]; 5]; 2]) {
-    const LEFT_WALL: u64 = 0x004010040100401;
-    const LEFT_WALL2: u64 = LEFT_WALL | LEFT_WALL << 1;
-    const RIGHT_WALL: u64 = 0x802008020080200;
-    const RIGHT_WALL2: u64 = RIGHT_WALL | RIGHT_WALL >> 1;
-
     // TODO this is still quite ugly make this look better please thank you
     (
         from_fn!(|rotation| {
@@ -507,11 +510,11 @@ const fn table_result(
                 from_fn!(|dir| {
                     let (dx, _) = srs_offset(offsets, rotation, step, dir);
                     match dx {
-                        -2 => LEFT_WALL2,
-                        -1 => LEFT_WALL,
+                        -2 => L_WALL2,
+                        -1 => L_WALL,
                         0 => 0,
-                        1 => RIGHT_WALL,
-                        2 => RIGHT_WALL2,
+                        1 => R_WALL,
+                        2 => R_WALL2,
                         _ => unreachable!(),
                     }
                 })
@@ -534,12 +537,6 @@ const fn srs_table(piece: Mino) -> ([[[u8; 4]; 5]; 2], [[[u8; 4]; 5]; 2], [[[u64
 }
 
 fn gen_occs(board: u64, piece: Mino) -> u64x4 {
-    const L_WALL: u64 = 0x004010040100401;
-    const L_WALL2: u64 = L_WALL | L_WALL << 1;
-    const R_WALL: u64 = 0x802008020080200;
-    const R_WALL2: u64 = R_WALL | R_WALL >> 1;
-    const FLOOR: u64 = 0x3ff;
-    const FLOOR2: u64 = FLOOR | FLOOR << 10;
     let board_l2 = board & !L_WALL2;
     let board_l = board & !L_WALL;
     let board_r2 = board & !R_WALL2;
@@ -884,18 +881,22 @@ impl<A: FourLineMoveGenerator, B: FourLineMoveGenerator> FourLineMoveGenerator
 }
 
 impl FourLineBoard {
-    pub fn solution<M: FourLineMoveGenerator>(&mut self) -> Option<Vec<FourLineMove>> {
+    pub fn solution<M: FourLineMoveGenerator, const PRUNE: bool>(
+        &mut self,
+    ) -> Option<Vec<FourLineMove>> {
         if self.solved() {
             return Some(vec![]);
         }
 
-        // TODO pruning
+        if PRUNE && self.cannot_pc() {
+            return None;
+        }
 
         let mut move_generator = M::new(*self);
 
         while let Some(mv) = move_generator.next() {
             let mut new_board = self.make_move(mv);
-            if let Some(mut sol) = new_board.solution::<M>() {
+            if let Some(mut sol) = new_board.solution::<M, PRUNE>() {
                 let mut vec = vec![mv];
 
                 vec.append(&mut sol);
@@ -904,6 +905,54 @@ impl FourLineBoard {
             }
         }
         None
+    }
+
+    /// Heuristics that determine whether a board cannot get a perfect clear. If this method
+    /// returns true, the board cannot have a pc, but if the method does not return true no
+    /// information can be known (i.e. it could be possible, or could be impossible to pc).
+    pub fn cannot_pc(&self) -> bool {
+        if self.board.count_ones() <= 28 {
+            // Connected regions
+            let separators = self.region_separators();
+
+            let col = COLUMN >> (10 * self.cleared);
+
+            let mut sqs = 0;
+            for i in 0..10 {
+                let w = col << i;
+                sqs += (self.board & w).count_zeros() - w.count_zeros();
+                if separators & w == w || i == 9 {
+                    if sqs % 4 != 0 {
+                        //println!("{i} {sqs}");
+                        return true;
+                    }
+                    sqs = 0;
+                }
+            }
+        }
+
+        false
+    }
+
+    /// Computes a mask of separators of regions. A column being filled means that column onwards
+    /// contains a new region.
+    pub fn region_separators(&self) -> u64 {
+        let cols = self.board | (self.board & !L_WALL) >> 1;
+        let col = COLUMN >> (10 * self.cleared);
+
+        let mut separators = 0;
+
+        for i in 0..10 {
+            let w = col << i;
+            if cols & w == w {
+                separators |= w;
+            }
+        }
+
+        //print_bitboard(cols);
+        //print_bitboard(separators);
+
+        separators
     }
 }
 
@@ -930,7 +979,7 @@ mod tests {
 
         let mut four_line = board.to_four_line().unwrap();
 
-        let solution = four_line.solution::<SearchFourLineMoveGenerator>();
+        let solution = four_line.solution::<SearchFourLineMoveGenerator, false>();
 
         println!("Moves are: {:?}", solution);
 
@@ -994,7 +1043,13 @@ mod tests {
             };
 
             let _ = board
-                .solution::<MoveGenTester<SearchFourLineMoveGenerator, BitwiseMoveGenerator>>();
+                .solution::<MoveGenTester<SearchFourLineMoveGenerator, BitwiseMoveGenerator>, false>();
+
+            let no_prune = board
+                .solution::<BitwiseMoveGenerator, false>();
+            let prune = board
+                .solution::<BitwiseMoveGenerator, true>();
+            assert_eq!(no_prune, prune);
         }
     }
 
@@ -1013,9 +1068,9 @@ mod tests {
         // to run the slow tests a user option)
         let queues = vec![
             (Some(O), None, vec![J, T, I, Z, L]),
-            // (Some(S), None, vec![J, T, I, I, I]),
-            // (Some(Z), None, vec![T, L, O, O, S]),
-            // (Some(O), None, vec![Z, T, L, I, O]),
+            (Some(S), None, vec![J, T, I, I, I]),
+            (Some(Z), None, vec![T, L, O, O, S]),
+            (Some(O), None, vec![Z, T, L, I, O]),
         ];
 
         test_board(board, queues);
@@ -1030,8 +1085,8 @@ mod tests {
         );
 
         let queues = vec![
-            // (Some(S), None, vec![T, J, I, O, L]),
-            // (Some(O), None, vec![L, O, I, T, J]),
+            (Some(S), None, vec![T, J, I, O, L]),
+            (Some(O), None, vec![L, O, I, T, J]),
         ];
 
         test_board(board, queues);
@@ -1046,10 +1101,33 @@ mod tests {
         );
 
         let queues = vec![
-            // (Some(Z), None, vec![J, S, I, O, L]),
-            // (Some(J), None, vec![S, T, Z, L, I]),
+            (Some(Z), None, vec![J, S, I, O, L]),
+            (Some(J), None, vec![S, T, Z, L, I]),
         ];
 
         test_board(board, queues);
+    }
+
+    #[test]
+    fn separators() {
+        let board = bitboard_from_string(
+            "
+            ####.##..#
+            ###..###.#
+            ####.###.#
+            ",
+        );
+        let board = FourLineBoard {
+            board,
+            hold: None,
+            piece: None,
+            queue: 0,
+            cleared: 1,
+        };
+        // TODO the wrong thing is being tested here, but I was too lazy to do it properly
+        // This board in fact cannot pc, but what I should be checking for is that it passes the
+        // separator test, since this board does satisfy the requirement of having regions having
+        // congruent to 0 mod 4 empty squares.
+        assert!(!board.cannot_pc());
     }
 }

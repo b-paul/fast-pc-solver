@@ -9,6 +9,7 @@ pub enum CellColour {
     GREEN,
     RED,
 }
+
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Mino {
     I,
@@ -19,6 +20,7 @@ pub enum Mino {
     S,
     Z,
 }
+
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Rotation {
     North,
@@ -26,23 +28,27 @@ pub enum Rotation {
     South,
     West,
 }
+
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ClearType {
     None,
     Mini,
     Full,
 }
+
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Shift {
     TapLeft,
     TapRight,
 }
+
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Spin {
     Clockwise,
     AntiClockwise,
     Half,
 }
+
 impl Mino {
     pub const fn srs_table(&self, rotation: Rotation, spin: Spin) -> [(i8, i8); 5] {
         // https://gist.github.com/torchlight/1832786cf053daa51bf188110b764090#file-minorotationimpl-java-L140=
