@@ -174,7 +174,7 @@ impl FourLineMove {
             return true;
         }
 
-        if self.y > 6 {
+        if self.y >= 6 {
             return false;
         }
 
@@ -411,6 +411,7 @@ impl Iterator for SearchFourLineMoveGenerator {
                 ..mv
             };
 
+            // TODO support non-instant soft drops
             // Add soft drop
             if !self.table.contains(&drop) {
                 self.stack.push(drop);
@@ -729,7 +730,11 @@ fn test_bitwise() {
 impl FourLineMoveGenerator for BitwiseMoveGenerator {
     fn new(board: FourLineBoard) -> Self {
         let cur_moves = bitwise_gen(board.board, board.cleared, board.piece).to_array();
-        let hold_moves = bitwise_gen(board.board, board.cleared, board.hold()).to_array();
+        let hold_moves = if board.piece != board.hold() {
+            bitwise_gen(board.board, board.cleared, board.hold()).to_array()
+        } else {
+            [0; 4]
+        };
 
         BitwiseMoveGenerator {
             cur_moves,
@@ -828,7 +833,9 @@ impl<A: FourLineMoveGenerator, B: FourLineMoveGenerator> FourLineMoveGenerator
             .map(|m| (board.make_move(m), m))
             .collect::<BTreeMap<_, _>>();
 
-        if a_moves.keys().collect::<HashSet<_>>() != b_moves.keys().collect::<HashSet<_>>() {
+        if a_moves.keys().map(|b| b.board).collect::<HashSet<_>>()
+            != b_moves.keys().map(|b| b.board).collect::<HashSet<_>>()
+        {
             print_bitboard(board.board);
 
             println!("{:?} {:?} {:?}", board.piece, board.hold, board.queue);
@@ -994,7 +1001,7 @@ mod tests {
             (Some(O), None, vec![J, T, I, Z, L]),
             // (Some(S), None, vec![J, T, I, I, I]), // breaks
             // (Some(Z), None, vec![T, L, O, O, S]), // breaks
-            // (Some(O), None, vec![Z, T, L, I, O]), // breaks
+                                                  // (Some(O), None, vec![Z, T, L, I, O]), // breaks
         ];
 
         test_board(board, queues);
