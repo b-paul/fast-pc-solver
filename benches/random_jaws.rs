@@ -26,7 +26,7 @@ pub fn criterion_benchmark(c: &mut Criterion) {
 
     c.bench_function("random jaws", |b| {
         b.iter(|| {
-            let _ = four_line.solution::<SearchFourLineMoveGenerator>();
+            let _ = four_line.solution::<BitwiseMoveGenerator>();
         })
     });
 }
