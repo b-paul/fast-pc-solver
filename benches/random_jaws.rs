@@ -1,5 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use fast_pc_solver::{four_line_board::*, interface_board::*, types::CellColour::*, types::Mino::*, types::*};
+use fast_pc_solver::{
+    four_line_board::*, interface_board::*, types::CellColour::*, types::Mino::*, types::*,
+};
 
 pub fn criterion_benchmark(c: &mut Criterion) {
     // Queue OTJJOL
