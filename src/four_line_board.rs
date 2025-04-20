@@ -217,6 +217,18 @@ impl FourLineMove {
 
         None
     }
+
+    /// Apply a single step of gravity to this move.
+    fn drop(&self, board: &FourLineBoard) -> Option<Self> {
+        if self.y == 0 {
+            return None;
+        }
+        let mv = FourLineMove {
+            y: self.y - 1,
+            ..*self
+        };
+        (!mv.collision(board)).then_some(mv)
+    }
 }
 
 impl FourLineBoard {
@@ -406,17 +418,17 @@ impl Iterator for SearchFourLineMoveGenerator {
                     }
                 }
             }
+            if let Some(mv) = mv.drop(&self.board) {
+                if !self.table.contains(&mv) {
+                    self.stack.push(mv);
+                    self.table.insert(mv);
+                }
+            }
+
             let drop = FourLineMove {
                 y: self.board.drop_y(mv),
                 ..mv
             };
-
-            // TODO support non-instant soft drops
-            // Add soft drop
-            if !self.table.contains(&drop) {
-                self.stack.push(drop);
-                self.table.insert(drop);
-            }
 
             let (piece_mask, min_x, min_y, _) = drop.piece_mask();
 
@@ -997,11 +1009,13 @@ mod tests {
             ",
         );
 
+        // Cases commented out for performance reasons lol this test is slow (TODO make the choice
+        // to run the slow tests a user option)
         let queues = vec![
             (Some(O), None, vec![J, T, I, Z, L]),
-            // (Some(S), None, vec![J, T, I, I, I]), // breaks
-            // (Some(Z), None, vec![T, L, O, O, S]), // breaks
-                                                  // (Some(O), None, vec![Z, T, L, I, O]), // breaks
+            // (Some(S), None, vec![J, T, I, I, I]),
+            // (Some(Z), None, vec![T, L, O, O, S]),
+            // (Some(O), None, vec![Z, T, L, I, O]),
         ];
 
         test_board(board, queues);
@@ -1016,8 +1030,8 @@ mod tests {
         );
 
         let queues = vec![
-            // (Some(S), None, vec![T, J, I, O, L]), // breaks
-            // (Some(O), None, vec![L, O, I, T, J]), // breaks
+            // (Some(S), None, vec![T, J, I, O, L]),
+            // (Some(O), None, vec![L, O, I, T, J]),
         ];
 
         test_board(board, queues);
@@ -1032,8 +1046,8 @@ mod tests {
         );
 
         let queues = vec![
-            // (Some(Z), None, vec![J, S, I, O, L]), // breaks
-            // (Some(J), None, vec![S, T, Z, L, I]), // breaks
+            // (Some(Z), None, vec![J, S, I, O, L]),
+            // (Some(J), None, vec![S, T, Z, L, I]),
         ];
 
         test_board(board, queues);
